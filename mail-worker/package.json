@@ -8,6 +8,9 @@
 		"deploy": "wrangler deploy",
 		"start": "wrangler dev"
 	},
+	"pnpm": {
+		"onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.7.5",
 		"vitest": "~3.0.7",
