@@ -12,7 +12,8 @@ function verifyPeopleToken(c) {
 	return !!token && token === expected;
 }
 
-app.post('/api/people/sendEmail', async (c) => {
+// 外部 URL 为 /api/people/sendEmail；index.js 会剥掉 /api 前缀后进入 Hono
+app.post('/people/sendEmail', async (c) => {
 	if (!verifyPeopleToken(c)) {
 		return c.json({ error: 'not_found' }, 404);
 	}
