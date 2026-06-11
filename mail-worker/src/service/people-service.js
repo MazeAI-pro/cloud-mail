@@ -125,6 +125,50 @@ const peopleService = {
 			attachments: atts,
 		};
 	},
+
+	/**
+	 * 站内信投递到 hire@ 时，从已落库的发件记录构造 people 回调 payload。
+	 */
+	async buildPayloadFromSentRow(c, env, sendEmailData, attList, toEmail, r2Domain) {
+		let r2Resolved = r2Domain;
+		if (r2Resolved === undefined) {
+			try {
+				const s = await settingService.query(c);
+				r2Resolved = s.r2Domain;
+			} catch {
+				r2Resolved = null;
+			}
+		}
+
+		let workerOrigin = env.people_worker_origin ?? null;
+		if (!workerOrigin && c?.req?.url) {
+			try {
+				workerOrigin = new URL(c.req.url).origin;
+			} catch {
+				workerOrigin = null;
+			}
+		}
+
+		const atts = (attList || []).map((att) => ({
+			filename: att.filename,
+			contentType: att.mimeType,
+			size: att.size,
+			url: this.buildAttachmentUrl(env, r2Resolved, workerOrigin, att.key),
+		}));
+
+		return {
+			to: toEmail,
+			from: sendEmailData.sendEmail ?? null,
+			fromName: sendEmailData.name ?? null,
+			subject: sendEmailData.subject ?? null,
+			text: sendEmailData.text ?? null,
+			html: sendEmailData.content ?? null,
+			messageId: sendEmailData.messageId ?? null,
+			inReplyTo: sendEmailData.inReplyTo ?? null,
+			references: sendEmailData.relation ?? null,
+			attachments: atts,
+		};
+	},
 };
 
 export default peopleService;

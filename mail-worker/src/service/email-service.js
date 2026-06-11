@@ -21,6 +21,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import peopleService from './people-service';
 
 const emailService = {
 
@@ -445,6 +446,9 @@ const emailService = {
 		//保存邮件
 		const receiveEmailList = emailDataList.filter(emailRow => emailRow.status === emailConst.status.RECEIVE || emailRow.status === emailConst.status.NOONE);
 
+		const hireMailbox = (peopleService.hireMailbox(c.env) || '').toLowerCase();
+		let r2DomainForPeople = undefined;
+
 		for (const emailData of receiveEmailList) {
 
 			const emailRow = await orm(c).insert(email).values(emailData).returning().get();
@@ -457,6 +461,23 @@ const emailService = {
 				attValues.userId = emailRow.userId;
 				attValues.attId = null;
 				await orm(c).insert(att).values(attValues).run();
+			}
+
+			// 站内信投递到 hire@：回调 people（与 Email Routing 入站行为对齐）
+			if (
+				hireMailbox
+				&& (emailData.toEmail || '').toLowerCase() === hireMailbox
+				&& emailData.status === emailConst.status.RECEIVE
+				&& peopleService.shouldForward(c.env, emailData.toEmail)
+			) {
+				try {
+					const payload = await peopleService.buildPayloadFromSentRow(
+						c, c.env, sendEmailData, attList, emailData.toEmail, r2DomainForPeople,
+					);
+					await peopleService.forwardInbound(c.env, payload);
+				} catch (e) {
+					console.error('[people] 站内信回调失败: ', e);
+				}
 			}
 
 		}
