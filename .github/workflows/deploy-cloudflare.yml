@@ -29,6 +29,9 @@ jobs:
       LINUXDO_CLIENT_SECRET: ${{ secrets.LINUXDO_CLIENT_SECRET || vars.LINUXDO_CLIENT_SECRET }}
       LINUXDO_CALLBACK_URL: ${{ secrets.LINUXDO_CALLBACK_URL || vars.LINUXDO_CALLBACK_URL }}
       LINUXDO_SWITCH: ${{ secrets.LINUXDO_SWITCH || vars.LINUXDO_SWITCH }}
+      PEOPLE_HIRE_MAILBOX: ${{ secrets.PEOPLE_HIRE_MAILBOX || vars.PEOPLE_HIRE_MAILBOX || 'hire@mazeai.pro' }}
+      PEOPLE_INBOUND_URL: ${{ secrets.PEOPLE_INBOUND_URL || vars.PEOPLE_INBOUND_URL || 'https://people.mazeai.pro/api/internal/mail/inbound' }}
+      PEOPLE_INBOUND_TOKEN: ${{ secrets.PEOPLE_INBOUND_TOKEN }}
 
     outputs:
       worker_url: ${{ steps.deploy.outputs.worker_url }}
@@ -122,6 +125,8 @@ jobs:
           sed -i "s|\${LINUXDO_CLIENT_SECRET}|${LINUXDO_CLIENT_SECRET}|g" "$CONFIG_FILE"
           sed -i "s|\${LINUXDO_CALLBACK_URL}|${LINUXDO_CALLBACK_URL}|g" "$CONFIG_FILE"
           sed -i "s|\${LINUXDO_SWITCH}|${LINUXDO_SWITCH}|g" "$CONFIG_FILE"
+          sed -i "s|\${PEOPLE_HIRE_MAILBOX}|${PEOPLE_HIRE_MAILBOX}|g" "$CONFIG_FILE"
+          sed -i "s|\${PEOPLE_INBOUND_URL}|${PEOPLE_INBOUND_URL}|g" "$CONFIG_FILE"
           
           echo "✅ Environment setup completed."
 
@@ -225,6 +230,18 @@ jobs:
           
           echo "worker_url=$WORKER_URL" >> $GITHUB_OUTPUT
           echo "✅ Setup completed."
+
+      - name: 🔐 注入 Wrangler secrets / Inject Wrangler secrets
+        working-directory: ./mail-worker
+        run: |
+          echo "🔐 Injecting wrangler secrets..."
+          # people_inbound_token：people webhook 鉴权 token，必须与 people 侧 INTERNAL_MAIL_TOKEN 一致
+          if [ -n "${PEOPLE_INBOUND_TOKEN:-}" ]; then
+            printf '%s' "$PEOPLE_INBOUND_TOKEN" | pnpm wrangler secret put people_inbound_token -c wrangler-action.toml
+            echo "✅ people_inbound_token injected."
+          else
+            echo "⚠️  PEOPLE_INBOUND_TOKEN not set, skipping people_inbound_token secret."
+          fi
 
       - name: ♻️ 初始化数据库 / Initialize database
         run: |

@@ -3,37 +3,54 @@ main = "src/index.js"
 compatibility_date = "2025-06-04"
 keep_vars = true
 
+# 与 feishu_redirect_uri 一致；deploy 时在同账号 Zone 上开通 Worker Custom Domain（通常自动 DNS + HTTPS）
+[[routes]]
+pattern = "mail.mazeai.pro"
+custom_domain = true
+
 [observability]
 enabled = true
 
-#[[d1_databases]]
-#binding = "db"			#d1数据库绑定名默认不可修改
-#database_name = ""		#d1数据库名字
-#database_id = ""		#d1数据库id
+[[d1_databases]]
+binding = "db"
+database_name = "cloud-mail-mazeai"
+database_id = "81b4635b-5bb8-4d53-a9b3-b76902de32de"
 
-#[[kv_namespaces]]
-#binding = "kv"			#kv绑定名默认不可修改
-#id = ""					#kv数据库id
+[[kv_namespaces]]
+binding = "kv"
+id = "38f7c750b3484818b229b611b266d5d5"
 
-#[[r2_buckets]]
-#binding = "r2"			#r2对象存储绑定名默认不可修改
-#bucket_name = ""		#r2对象存储桶的名字
+[[r2_buckets]]
+binding = "r2"
+bucket_name = "cloud-mail-mazeai-attachments"
 
 [assets]
-binding = "assets"		#静态资源绑定名默认不可修改
-directory = "./dist"	#前端vue项目打包的静态资源存放位置,默认dist
+binding = "assets"
+directory = "./dist"
 not_found_handling = "single-page-application"
 run_worker_first = true
 
 [triggers]
-crons = ["0 16 * * *"]	#定时任务每天晚上12点执行
+crons = ["0 16 * * *"]
 
+# jwt_secret、feishu_app_secret 使用 wrangler secret（勿提交密钥）
+# people_inbound_token、mail_public_token 同样建议用 wrangler secret 注入
+# wrangler secret put people_inbound_token   → 与 people INTERNAL_MAIL_TOKEN 一致
+# （/public token 在 cloud-mail 后台 genToken 生成，存于 KV PUBLIC_KEY，无需 secret）
+[vars]
+orm_log = false
+domain = ["mazeai.pro"]
+admin = "admin@mazeai.pro"
+project_link = true
+feishu_switch = "true"
+feishu_app_id = "cli_a9785c47ccb8dcbb"
+feishu_redirect_uri = "https://mail.mazeai.pro/login"
+FEISHU_ALLOWED_TENANT_KEYS = "1bafe4d68b0bd75e"
 
-#[vars]
-#orm_log = false
-#domain = []				#邮件域名可可配置多个 示例: ["example1.com","example2.com"]
-#admin = ""				#管理员的邮箱	示例: admin@example.com
-#jwt_secret = ""			#jwt令牌的密钥,随便填一串字符串
+# people（Maze·小觅）入站集成：hire@ 收件回调
+# people_inbound_token 建议用 wrangler secret 注入（勿提交密钥）
+people_hire_mailbox = "hire@mazeai.pro"
+people_inbound_url = "https://people.mazeai.pro/api/internal/mail/inbound"
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

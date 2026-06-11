@@ -10,6 +10,7 @@ import emailUtils from '../utils/email-utils';
 import roleService from '../service/role-service';
 import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
+import peopleService from '../service/people-service';
 
 export async function email(message, env, ctx) {
 
@@ -162,6 +163,21 @@ export async function email(message, env, ctx) {
 
 			}));
 
+		}
+
+		//回调 people（Maze·小觅）：hire@ 收到候选人邮件时转发正文+附件，由 people 做简历提取/入库/通知面试官
+		if (peopleService.shouldForward(env, message.to)) {
+			try {
+				const payload = await peopleService.buildPayload({ env }, env, email, message, attachments, r2Domain);
+				const task = peopleService.forwardInbound(env, payload);
+				if (ctx && typeof ctx.waitUntil === 'function') {
+					ctx.waitUntil(task);
+				} else {
+					await task;
+				}
+			} catch (e) {
+				console.error('[people] 构造回调 payload 失败: ', e);
+			}
 		}
 
 	} catch (e) {

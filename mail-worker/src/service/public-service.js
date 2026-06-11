@@ -10,10 +10,13 @@ import verifyUtils from '../utils/verify-utils';
 import { t } from '../i18n/i18n';
 import reqUtils from '../utils/req-utils';
 import dayjs from 'dayjs';
-import { isDel, roleConst } from '../const/entity-const';
+import { isDel, roleConst, emailConst, settingConst } from '../const/entity-const';
 import email from '../entity/email';
 import userService from './user-service';
+import accountService from './account-service';
+import settingService from './setting-service';
 import KvConst from '../const/kv-const';
+import { Resend } from 'resend';
 
 const publicService = {
 
@@ -158,6 +161,122 @@ const publicService = {
 			}
 		}
 
+	},
+
+	/**
+	 * 服务端（people/Maze·小觅）以受管账号身份发信的 Open API。
+	 *
+	 * 与 /email/send 不同：不依赖登录态 JWT/userId，而是按 from 地址解析受管账号，
+	 * 用对应域名的 Resend token 发出。支持 inReplyTo 以维持会话线程，
+	 * 并把发件记录落到该账号的已发件箱，保证 hire@ 会话完整。
+	 *
+	 * @returns {{ messageId: string }} 自生成的 RFC Message-ID，供后续回信线程匹配
+	 */
+	async sendEmail(c, params) {
+
+		let { from, to, subject, text, html, inReplyTo } = params;
+
+		if (!from || !verifyUtils.isEmail(from)) {
+			throw new BizError(t('notEmail'));
+		}
+
+		const recipients = Array.isArray(to) ? to : [to];
+		const cleanRecipients = recipients.filter(Boolean).map((item) => String(item).trim());
+		if (cleanRecipients.length === 0) {
+			throw new BizError(t('notEmail'));
+		}
+		for (const r of cleanRecipients) {
+			if (!verifyUtils.isEmail(r)) {
+				throw new BizError(t('notEmail'));
+			}
+		}
+
+		const { resendTokens, send, domainList } = await settingService.query(c);
+
+		if (send === settingConst.send.CLOSE) {
+			throw new BizError(t('disabledSend'), 403);
+		}
+
+		const accountRow = await accountService.selectByEmailIncludeDel(c, from);
+		if (!accountRow) {
+			throw new BizError(t('senderAccountNotExist'));
+		}
+
+		const allInternal = cleanRecipients.every((addr) => {
+			const domain = '@' + emailUtils.getDomain(addr);
+			return domainList.includes(domain);
+		});
+
+		const domain = emailUtils.getDomain(from);
+		const resendToken = resendTokens[domain];
+
+		if (!resendToken && !allInternal) {
+			throw new BizError(t('noResendToken'));
+		}
+
+		const name = accountRow.name || emailUtils.getName(from);
+
+		// 自生成 Message-ID，便于候选人回信时按 In-Reply-To 匹配回同一线程
+		const messageId = `<${uuidv4()}@${domain}>`;
+
+		let resendResult = {};
+
+		if (!allInternal) {
+			const resend = new Resend(resendToken);
+
+			const headers = { 'Message-ID': messageId };
+			if (inReplyTo) {
+				headers['In-Reply-To'] = inReplyTo;
+				headers['References'] = inReplyTo;
+			}
+
+			const sendForm = {
+				from: `${name} <${from}>`,
+				to: [...cleanRecipients],
+				subject: subject ?? '',
+				text: text ?? undefined,
+				html: html ?? undefined,
+				headers,
+			};
+
+			resendResult = await resend.emails.send(sendForm);
+
+			const { error } = resendResult;
+			if (error) {
+				throw new BizError(error.message);
+			}
+		}
+
+		const { data } = resendResult;
+
+		// 落库到发件账号的已发件箱，保证会话完整
+		const recipientJson = JSON.stringify(cleanRecipients.map((addr) => ({ address: addr, name: '' })));
+
+		try {
+			await orm(c).insert(email).values({
+				sendEmail: from,
+				name,
+				accountId: accountRow.accountId,
+				userId: accountRow.userId,
+				subject: subject ?? '',
+				text: text ?? '',
+				content: html ?? '',
+				recipient: recipientJson,
+				toEmail: cleanRecipients[0],
+				toName: emailUtils.getName(cleanRecipients[0]),
+				inReplyTo: inReplyTo ?? '',
+				relation: inReplyTo ?? '',
+				messageId,
+				type: emailConst.type.SEND,
+				status: emailConst.status.SENT,
+				resendEmailId: data?.id ?? null,
+				isDel: isDel.NORMAL,
+			}).returning().get();
+		} catch (e) {
+			console.error('[public/sendEmail] 落库失败: ', e);
+		}
+
+		return { messageId };
 	},
 
 	async genToken(c, params) {
