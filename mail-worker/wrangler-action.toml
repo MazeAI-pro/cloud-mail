@@ -5,9 +5,8 @@ compatibility_date = "2025-06-04"
 [observability]
 enabled = true
 
-[[routes]]
-pattern = "${CUSTOM_DOMAIN}"
-custom_domain = true
+# 自定义域名（mail.mazeai.pro）在 Cloudflare Dashboard 绑定，CI 不再通过 [[routes]] 维护，
+# 避免需要 Zone > Workers Routes 权限，也不影响已有域名绑定。
 
 [[d1_databases]]
 binding = "db"
