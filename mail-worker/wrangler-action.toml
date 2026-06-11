@@ -43,8 +43,8 @@ linuxdo_client_secret = "${LINUXDO_CLIENT_SECRET}"
 linuxdo_callback_url = "${LINUXDO_CALLBACK_URL}"
 linuxdo_switch = "${LINUXDO_SWITCH}"
 
-# people（Maze·小觅）入站集成：hire@ 收件回调
-# people_inbound_token 通过 wrangler secret put 注入（不落 toml）
+# people（Maze·小觅）集成：hire@ 收件回调 + 出站发信鉴权
+# cloudmail_people_token 通过 wrangler secret put 注入（不落 toml）
 people_hire_mailbox = "${PEOPLE_HIRE_MAILBOX}"
 people_inbound_url = "${PEOPLE_INBOUND_URL}"
 

@@ -16,7 +16,7 @@ const peopleService = {
 	 * 收件箱地址匹配 env.people_hire_mailbox（默认 hire@<第一个域名>）时触发。
 	 */
 	shouldForward(env, toEmail) {
-		if (!env || !env.people_inbound_url || !env.people_inbound_token) {
+		if (!env || !env.people_inbound_url || !env.cloudmail_people_token) {
 			return false;
 		}
 		const target = (this.hireMailbox(env) || '').toLowerCase();
@@ -69,7 +69,7 @@ const peopleService = {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					'X-Internal-Token': env.people_inbound_token,
+					'X-Internal-Token': env.cloudmail_people_token,
 				},
 				body: JSON.stringify(payload),
 			});

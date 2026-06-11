@@ -32,7 +32,7 @@ jobs:
       LINUXDO_SWITCH: ${{ secrets.LINUXDO_SWITCH || vars.LINUXDO_SWITCH }}
       PEOPLE_HIRE_MAILBOX: ${{ secrets.PEOPLE_HIRE_MAILBOX || vars.PEOPLE_HIRE_MAILBOX || 'hire@mazeai.pro' }}
       PEOPLE_INBOUND_URL: ${{ secrets.PEOPLE_INBOUND_URL || vars.PEOPLE_INBOUND_URL || 'https://people.mazeai.pro/api/internal/mail/inbound' }}
-      PEOPLE_INBOUND_TOKEN: ${{ secrets.PEOPLE_INBOUND_TOKEN }}
+      CLOUDMAIL_PEOPLE_TOKEN: ${{ secrets.CLOUDMAIL_PEOPLE_TOKEN || secrets.PEOPLE_INBOUND_TOKEN }}
 
     outputs:
       worker_url: ${{ steps.deploy.outputs.worker_url }}
@@ -235,12 +235,12 @@ jobs:
         working-directory: ./mail-worker
         run: |
           echo "🔐 Injecting wrangler secrets..."
-          # people_inbound_token：people webhook 鉴权 token，必须与 people 侧 INTERNAL_MAIL_TOKEN 一致
-          if [ -n "${PEOPLE_INBOUND_TOKEN:-}" ]; then
-            printf '%s' "$PEOPLE_INBOUND_TOKEN" | pnpm wrangler secret put people_inbound_token -c wrangler-action.toml
-            echo "✅ people_inbound_token injected."
+          # cloudmail_people_token：people ↔ cloud-mail 双向集成密钥，与 people CLOUDMAIL_PEOPLE_TOKEN 一致
+          if [ -n "${CLOUDMAIL_PEOPLE_TOKEN:-}" ]; then
+            printf '%s' "$CLOUDMAIL_PEOPLE_TOKEN" | pnpm wrangler secret put cloudmail_people_token -c wrangler-action.toml
+            echo "✅ cloudmail_people_token injected."
           else
-            echo "⚠️  PEOPLE_INBOUND_TOKEN not set, skipping people_inbound_token secret."
+            echo "⚠️  CLOUDMAIL_PEOPLE_TOKEN not set, skipping cloudmail_people_token secret."
           fi
 
       - name: ♻️ 初始化数据库 / Initialize database

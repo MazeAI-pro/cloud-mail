@@ -34,9 +34,8 @@ run_worker_first = true
 crons = ["0 16 * * *"]
 
 # jwt_secret、feishu_app_secret 使用 wrangler secret（勿提交密钥）
-# people_inbound_token、mail_public_token 同样建议用 wrangler secret 注入
-# wrangler secret put people_inbound_token   → 与 people INTERNAL_MAIL_TOKEN 一致
-# （/public token 在 cloud-mail 后台 genToken 生成，存于 KV PUBLIC_KEY，无需 secret）
+# cloudmail_people_token：people ↔ cloud-mail 集成密钥（双向，仅 hire@）
+# wrangler secret put cloudmail_people_token   → 与 people CLOUDMAIL_PEOPLE_TOKEN 一致
 [vars]
 orm_log = false
 domain = ["mazeai.pro"]
@@ -47,8 +46,8 @@ feishu_app_id = "cli_a9785c47ccb8dcbb"
 feishu_redirect_uri = "https://mail.mazeai.pro/login"
 FEISHU_ALLOWED_TENANT_KEYS = "1bafe4d68b0bd75e"
 
-# people（Maze·小觅）入站集成：hire@ 收件回调
-# people_inbound_token 建议用 wrangler secret 注入（勿提交密钥）
+# people（Maze·小觅）集成：hire@ 收件回调 + 出站发信鉴权
+# cloudmail_people_token 建议用 wrangler secret 注入（勿提交密钥）
 people_hire_mailbox = "hire@mazeai.pro"
 people_inbound_url = "https://people.mazeai.pro/api/internal/mail/inbound"
 
