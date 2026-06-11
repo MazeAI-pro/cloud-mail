@@ -15,6 +15,7 @@ import email from '../entity/email';
 import userService from './user-service';
 import accountService from './account-service';
 import settingService from './setting-service';
+import emailService from './email-service';
 import KvConst from '../const/kv-const';
 import { Resend } from 'resend';
 
@@ -252,8 +253,9 @@ const publicService = {
 		// 落库到发件账号的已发件箱，保证会话完整
 		const recipientJson = JSON.stringify(cleanRecipients.map((addr) => ({ address: addr, name: '' })));
 
+		let emailResult;
 		try {
-			await orm(c).insert(email).values({
+			emailResult = await orm(c).insert(email).values({
 				sendEmail: from,
 				name,
 				accountId: accountRow.accountId,
@@ -274,6 +276,11 @@ const publicService = {
 			}).returning().get();
 		} catch (e) {
 			console.error('[public/sendEmail] 落库失败: ', e);
+		}
+
+		// 站内收件人（同域邮箱）：写入收件方收件箱，与 /email/send 行为一致
+		if (allInternal && emailResult) {
+			await emailService.HandleOnSiteEmail(c, cleanRecipients, emailResult, []);
 		}
 
 		return { messageId };
