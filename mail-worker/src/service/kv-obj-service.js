@@ -1,7 +1,13 @@
+import { normalizeContentDisposition } from '../utils/header-utils';
+
 const kvObjService = {
 
 	async putObj(c, key, content, metadata) {
 		await c.env.kv.put(key, content, { metadata: metadata });
+	},
+
+	async getObj(c, key) {
+		return await c.env.kv.getWithMetadata(key, { type: "arrayBuffer"});
 	},
 
 	async deleteObj(c, keys) {
@@ -19,14 +25,23 @@ const kvObjService = {
 
 	async toObjResp(c, key) {
 
-		const obj = await c.env.kv.getWithMetadata(key, { type: "arrayBuffer"});
+		const obj = await this.getObj(c, key);
+		if (!obj.value) {
+			return new Response('Not found', { status: 404 });
+		}
+
+		const headers = new Headers();
+		headers.set('Access-Control-Allow-Origin', '*');
+		headers.set('Content-Type', obj.metadata?.contentType || 'application/octet-stream');
+		if (obj.metadata?.contentDisposition) {
+			headers.set('Content-Disposition', normalizeContentDisposition(obj.metadata.contentDisposition));
+		}
+		if (obj.metadata?.cacheControl) {
+			headers.set('Cache-Control', obj.metadata.cacheControl);
+		}
 
 		return new Response(obj.value, {
-			headers: {
-				'Content-Type': obj.metadata?.contentType || 'application/octet-stream',
-				'Content-Disposition': obj.metadata?.contentDisposition || null,
-				'Cache-Control': obj.metadata?.cacheControl || null
-			}
+			headers,
 		});
 
 	}

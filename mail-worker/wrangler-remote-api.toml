@@ -1,0 +1,39 @@
+name = "cloud-mail-remote-api"
+main = "src/index.js"
+compatibility_date = "2025-06-04"
+keep_vars = true
+
+[observability]
+enabled = true
+
+[dev]
+ip = "127.0.0.1"
+
+[[d1_databases]]
+binding = "db"
+database_name = "cloud-mail-mazeai"
+database_id = "81b4635b-5bb8-4d53-a9b3-b76902de32de"
+experimental_remote = true
+
+[[kv_namespaces]]
+binding = "kv"
+id = "38f7c750b3484818b229b611b266d5d5"
+experimental_remote = true
+
+[[r2_buckets]]
+binding = "r2"
+bucket_name = "cloud-mail-mazeai-attachments"
+experimental_remote = true
+
+[vars]
+orm_log = false
+domain = ["mazeai.pro"]
+admin = "admin@mazeai.pro"
+project_link = true
+feishu_switch = "true"
+feishu_app_id = "cli_a9785c47ccb8dcbb"
+feishu_redirect_uri = "http://localhost:3002/login"
+FEISHU_ALLOWED_TENANT_KEYS = "1bafe4d68b0bd75e"
+
+people_hire_mailbox = "hire@mazeai.pro"
+people_inbound_url = "https://people.mazeai.pro/api/internal/mail/inbound"

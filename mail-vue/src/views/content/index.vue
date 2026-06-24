@@ -55,9 +55,7 @@
                 <div class="att-size">{{ formatBytes(att.size) }}</div>
                 <div class="opt-icon att-icon">
                   <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                  <a :href="cvtR2Url(att.key)" download>
-                    <Icon icon="system-uicons:push-down" width="22" height="22"/>
-                  </a>
+                  <Icon icon="system-uicons:push-down" width="22" height="22" @click="downloadAtt(att)"/>
                 </div>
               </div>
             </div>
@@ -146,6 +144,19 @@ function showImage(key) {
 
 function isImage(filename) {
   return ['png', 'jpg', 'jpeg', 'bmp', 'gif','jfif'].includes(getExtName(filename))
+}
+
+async function downloadAtt(att) {
+  const response = await fetch(cvtR2Url(att.key));
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = att.filename || 'attachment';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function formateReceive(recipient) {

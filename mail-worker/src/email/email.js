@@ -12,6 +12,24 @@ import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import peopleService from '../service/people-service';
 
+export async function readMessageRaw(message) {
+	return await new Response(message.raw).arrayBuffer();
+}
+
+export async function parseRawEmail(message) {
+	return await PostalMime.parse(await readMessageRaw(message));
+}
+
+export function resolveReceiveStatus({ account, noRecipient, shouldForwardToPeople }) {
+	if (!account && noRecipient === settingConst.noRecipient.CLOSE && !shouldForwardToPeople) {
+		return { rejectReason: 'Recipient not found', status: null };
+	}
+	return {
+		rejectReason: null,
+		status: account ? emailConst.status.RECEIVE : emailConst.status.NOONE,
+	};
+}
+
 export async function email(message, env, ctx) {
 
 	try {
@@ -27,6 +45,7 @@ export async function email(message, env, ctx) {
 			r2Domain,
 			noRecipient
 		} = await settingService.query({ env });
+		const shouldForwardToPeople = peopleService.shouldForward(env, message.to);
 
 		if (receive === settingConst.receive.CLOSE) {
 			message.setReject('Service suspended');
@@ -34,21 +53,13 @@ export async function email(message, env, ctx) {
 		}
 
 
-		const reader = message.raw.getReader();
-		let content = '';
-
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			content += new TextDecoder().decode(value);
-		}
-
-		const email = await PostalMime.parse(content);
+		const email = await parseRawEmail(message);
 
 		const account = await accountService.selectByEmailIncludeDel({ env: env }, message.to);
+		const receiveStatus = resolveReceiveStatus({ account, noRecipient, shouldForwardToPeople });
 
-		if (!account && noRecipient === settingConst.noRecipient.CLOSE) {
-			message.setReject('Recipient not found');
+		if (receiveStatus.rejectReason) {
+			message.setReject(receiveStatus.rejectReason);
 			return;
 		}
 
@@ -130,7 +141,23 @@ export async function email(message, env, ctx) {
 			console.error(e);
 		}
 
-		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId);
+		emailRow = await emailService.completeReceive({ env }, receiveStatus.status, emailRow.emailId);
+
+		// 回调 people（Maze·小觅）：hire@ 收到候选人邮件时转发正文+附件，由 people 做简历提取/入库/通知面试官。
+		// 这个流程不能受普通转发/规则收件开关影响，否则 hire@ 独立收件箱或规则列表漏配时会静默断掉。
+		if (shouldForwardToPeople) {
+			try {
+				const payload = await peopleService.buildPayload({ env }, env, email, message, attachments, r2Domain);
+				const task = peopleService.forwardInbound(env, payload);
+				if (ctx && typeof ctx.waitUntil === 'function') {
+					ctx.waitUntil(task);
+				} else {
+					await task;
+				}
+			} catch (e) {
+				console.error('[people] 构造回调 payload 失败: ', e);
+			}
+		}
 
 
 		if (ruleType === settingConst.ruleType.RULE) {
@@ -163,21 +190,6 @@ export async function email(message, env, ctx) {
 
 			}));
 
-		}
-
-		//回调 people（Maze·小觅）：hire@ 收到候选人邮件时转发正文+附件，由 people 做简历提取/入库/通知面试官
-		if (peopleService.shouldForward(env, message.to)) {
-			try {
-				const payload = await peopleService.buildPayload({ env }, env, email, message, attachments, r2Domain);
-				const task = peopleService.forwardInbound(env, payload);
-				if (ctx && typeof ctx.waitUntil === 'function') {
-					ctx.waitUntil(task);
-				} else {
-					await task;
-				}
-			} catch (e) {
-				console.error('[people] 构造回调 payload 失败: ', e);
-			}
 		}
 
 	} catch (e) {

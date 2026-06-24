@@ -14,6 +14,10 @@ export function cvtR2Url(key) {
     let domain = settings.r2Domain
 
     if (!domain) {
+        const apiBaseUrl = import.meta.env.VITE_BASE_URL || '';
+        if (apiBaseUrl.startsWith('http')) {
+            return apiBaseUrl.replace(/\/api\/?$/, '').replace(/\/$/, '') + '/' + key;
+        }
         return key;
     }
 

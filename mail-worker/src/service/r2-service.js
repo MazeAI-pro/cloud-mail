@@ -1,6 +1,7 @@
 import s3Service from './s3-service';
 import settingService from './setting-service';
 import kvObjService from './kv-obj-service';
+import { normalizeContentDisposition } from '../utils/header-utils';
 
 const r2Service = {
 
@@ -41,7 +42,51 @@ const r2Service = {
 	},
 
 	async getObj(c, key) {
-		return await c.env.r2.get(key);
+		const storageType = await this.storageType(c);
+
+		if (storageType === 'KV') {
+			const obj = await kvObjService.getObj(c, key);
+			if (!obj.value) {
+				return null;
+			}
+			return {
+				body: obj.value,
+				httpMetadata: {
+					contentType: obj.metadata?.contentType,
+					contentDisposition: obj.metadata?.contentDisposition,
+					cacheControl: obj.metadata?.cacheControl,
+				}
+			};
+		}
+
+		if (storageType === 'R2') {
+			return await c.env.r2.get(key);
+		}
+
+		if (storageType === 'S3') {
+			return await s3Service.getObj(c, key);
+		}
+
+		return null;
+	},
+
+	async toObjResp(c, key) {
+		const obj = await this.getObj(c, key);
+		if (!obj) {
+			return new Response('Not found', { status: 404 });
+		}
+
+		const headers = new Headers();
+		headers.set('Access-Control-Allow-Origin', '*');
+		headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+		if (obj.httpMetadata?.contentDisposition) {
+			headers.set('Content-Disposition', normalizeContentDisposition(obj.httpMetadata.contentDisposition));
+		}
+		if (obj.httpMetadata?.cacheControl) {
+			headers.set('Cache-Control', obj.httpMetadata.cacheControl);
+		}
+
+		return new Response(obj.body, { headers });
 	},
 
 	async delete(c, key) {
