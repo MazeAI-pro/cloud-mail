@@ -11,8 +11,15 @@
     <div class="form-wrapper">
       <div class="container">
         <span class="form-title">{{ settingStore.settings.title }}</span>
-        <span class="form-desc" v-if="show === 'login'">{{ $t('loginTitle') }}</span>
+        <span class="form-desc" v-if="show === 'feishu'">使用飞书账号快速登录邮箱系统</span>
+        <span class="form-desc" v-else-if="show === 'login'">{{ $t('loginTitle') }}</span>
         <span class="form-desc" v-else>{{ $t('regTitle') }}</span>
+        <div v-show="show === 'feishu'">
+          <el-button class="btn" type="primary" @click="feishuLogin">
+            <Icon icon="simple-icons:lark" width="18" height="18" style="margin-right: 8px" />飞书登录
+          </el-button>
+          <div class="switch"><span @click="show = 'login'">使用账号密码登录</span></div>
+        </div>
         <div v-show="show === 'login'">
           <el-input :class="settingStore.settings.loginDomain === 0 ? 'email-input' : ''" v-model="form.email"
                     type="text" :placeholder="$t('emailAccount')" autocomplete="off">
@@ -44,17 +51,15 @@
           <el-button class="btn" type="primary" @click="submit" :loading="loginLoading"
           >{{ $t('loginBtn') }}
           </el-button>
-          <el-button class="btn" v-if="settingStore.settings.linuxdoSwitch"  style="margin-top: 10px"  @click="linuxDoLogin">
-            <el-avatar src="/image/linuxdo.webp" :size="18" style="margin-right: 10px" />LinuxDo
-          </el-button>
+          <div class="switch" v-if="settingStore.settings.feishuSwitch"><span @click="show = 'feishu'">返回飞书登录</span></div>
         </div>
-        <div v-show="show !== 'login'">
+        <div v-show="show === 'register'">
           <el-input class="email-input" v-model="registerForm.email" type="text" :placeholder="$t('emailAccount')"
                     autocomplete="off">
             <template #append>
               <div @click.stop="openSelect">
                 <el-select
-                    v-if="show !== 'login'"
+                    v-if="show === 'register'"
                     ref="mySelect"
                     v-model="suffix"
                     :placeholder="$t('select')"
@@ -94,19 +99,17 @@
           <el-button class="btn" style="margin: 0" type="primary" @click="submitRegister" :loading="registerLoading"
           >{{ $t('regBtn') }}
           </el-button>
-          <el-button v-if="settingStore.settings.linuxdoSwitch" class="btn" style="margin-top: 10px"  @click="linuxDoLogin">
-            <el-avatar src="/image/linuxdo.webp" :size="18" style="margin-right: 10px" />LinuxDo
-          </el-button>
+          <div class="switch" v-if="settingStore.settings.feishuSwitch"><span @click="show = 'feishu'">返回飞书登录</span></div>
         </div>
         <template v-if="settingStore.settings.register === 0">
-          <div class="switch" @click="show = 'register'" v-if="show === 'login'">{{ $t('noAccount') }}
-            <span>{{ $t('regSwitch') }}</span></div>
-          <div class="switch" @click="show = 'login'" v-else>{{ $t('hasAccount') }} <span>{{ $t('loginSwitch') }}</span>
+          <div class="switch" v-if="show === 'login'">{{ $t('noAccount') }}
+            <span @click="show = 'register'">{{ $t('regSwitch') }}</span></div>
+          <div class="switch" v-else-if="show === 'register'">{{ $t('hasAccount') }} <span @click="show = settingStore.settings.feishuSwitch ? 'feishu' : 'login'">{{ $t('loginSwitch') }}</span>
           </div>
         </template>
       </div>
     </div>
-    <el-dialog class="bind-dialog" v-model="showBindForm"  title="注册邮箱" >
+    <el-dialog class="bind-dialog" v-model="showBindForm"  title="绑定邮箱" >
       <div class="bind-container">
         <el-input v-model="bindForm.email" type="text" :placeholder="$t('emailAccount')" autocomplete="off">
           <template #append>
@@ -131,10 +134,6 @@
             </div>
           </template>
         </el-input>
-        <el-input v-if="settingStore.settings.regKey === 0" v-model="bindForm.code" :placeholder="$t('regKey')"
-                  type="text" autocomplete="off"/>
-        <el-input v-if="settingStore.settings.regKey === 2" v-model="bindForm.code"
-                  :placeholder="$t('regKeyOptional')" type="text" autocomplete="off"/>
         <el-button class="btn" type="primary" @click="bind" :loading="bindLoading"
         >绑定
         </el-button>
@@ -161,7 +160,7 @@ import {cvtR2Url} from "@/utils/convert.js";
 import {loginUserInfo} from "@/request/my.js";
 import {permsToRouter} from "@/perm/perm.js";
 import {useI18n} from "vue-i18n";
-import {oauthBindUser, oauthLinuxDoLogin} from "@/request/ouath.js";
+import {oauthBindUser, oauthFeishuLogin} from "@/request/ouath.js";
 
 const {t} = useI18n();
 const accountStore = useAccountStore();
@@ -172,12 +171,11 @@ const loginLoading = ref(false)
 const bindLoading = ref(false)
 const oauthLoading = ref(false);
 const showBindForm = ref(false);
-const show = ref('login')
+const show = ref(settingStore.settings.feishuSwitch ? 'feishu' : 'login')
 
 const bindForm = reactive({
   email: '',
   oauthUserId: '',
-  code: ''
 })
 
 const form = reactive({
@@ -250,16 +248,16 @@ const openSelect = () => {
   mySelect.value.toggleMenu()
 }
 
-function linuxDoLogin() {
-  const clientId = settingStore.settings.linuxdoClientId
-  const redirectUri = encodeURIComponent(settingStore.settings.linuxdoCallbackUrl)
+function feishuLogin() {
+  const appId = settingStore.settings.feishuAppId
+  const redirectUri = encodeURIComponent(settingStore.settings.feishuRedirectUri)
   window.location.href =
-      `https://connect.linux.do/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid+profile+email`
+      `https://accounts.feishu.cn/open-apis/authen/v1/authorize?client_id=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=contact:user.base:readonly+contact:user.email:readonly`
 }
 
-linuxDoGetUser();
+feishuGetUser();
 
-async function linuxDoGetUser() {
+async function feishuGetUser() {
 
   const params = new URLSearchParams(window.location.search)
   const code = params.get('code')
@@ -267,7 +265,7 @@ async function linuxDoGetUser() {
   if (code) {
 
     oauthLoading.value = true
-    oauthLinuxDoLogin(code).then(data => {
+    oauthFeishuLogin(code).then(data => {
 
       bindForm.oauthUserId = data.userInfo.oauthUserId;
 
@@ -275,7 +273,7 @@ async function linuxDoGetUser() {
         showBindForm.value = true
         oauthLoading.value = false
         ElMessage({
-          message: '请注册绑定一个邮箱',
+          message: '请绑定您的邮箱前缀',
           type: 'warning',
           duration: 4000,
           plain: true,
@@ -326,21 +324,7 @@ function bind() {
     return
   }
 
-  if (settingStore.settings.regKey === 0) {
-
-    if (!bindForm.code) {
-
-      ElMessage({
-        message: t('emptyRegKeyMsg'),
-        type: 'error',
-        plain: true,
-      })
-      return
-    }
-
-  }
-
-  const form = {email: bindForm.email + suffix.value, oauthUserId: bindForm.oauthUserId, code: bindForm.code}
+  const form = {email: bindForm.email + suffix.value, oauthUserId: bindForm.oauthUserId}
 
   bindLoading.value = true
   oauthBindUser(form).then(data => {
@@ -428,7 +412,9 @@ function submitRegister() {
     return
   }
 
-  if (!isEmail(registerForm.email + suffix.value)) {
+  const email = registerForm.email.includes('@') ? registerForm.email : registerForm.email + suffix.value;
+
+  if (!isEmail(email)) {
     ElMessage({
       message: t('notEmailMsg'),
       type: 'error',
@@ -465,20 +451,6 @@ function submitRegister() {
     return
   }
 
-  if (settingStore.settings.regKey === 0) {
-
-    if (!registerForm.code) {
-
-      ElMessage({
-        message: t('emptyRegKeyMsg'),
-        type: 'error',
-        plain: true,
-      })
-      return
-    }
-
-  }
-
   if (!verifyToken && (settingStore.settings.registerVerify === 0 || (settingStore.settings.registerVerify === 2 && settingStore.settings.regVerifyOpen))) {
     if (!verifyShow.value) {
       verifyShow.value = true
@@ -507,7 +479,7 @@ function submitRegister() {
   registerLoading.value = true
 
   const form = {
-    email: registerForm.email + suffix.value,
+    email,
     password: registerForm.password,
     token: verifyToken,
     code: registerForm.code
@@ -628,6 +600,13 @@ function submitRegister() {
     span {
       color: var(--login-switch-color);
       cursor: pointer;
+      user-select: none;
+      transition: opacity 0.2s ease;
+
+      &:hover {
+        opacity: 0.8;
+        text-decoration: underline;
+      }
     }
   }
 

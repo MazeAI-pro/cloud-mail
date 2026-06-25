@@ -1,7 +1,7 @@
 import http from '@/axios/index.js';
 
-export function oauthLinuxDoLogin(code) {
-    return http.post('/oauth/linuxDo/login',{code})
+export function oauthFeishuLogin(code) {
+    return http.post('/oauth/feishu/login', { code })
 }
 
 export function oauthBindUser(form) {

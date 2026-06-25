@@ -5,12 +5,62 @@ import { eq, inArray } from 'drizzle-orm';
 import userService from "./user-service";
 import loginService from "./login-service";
 import cryptoUtils from "../utils/crypto-utils";
+import { t } from '../i18n/i18n.js';
+
+function feishuSwitchOn(c) {
+	const v = c.env.feishu_switch;
+	if (typeof v === 'string' && v === 'true') return true;
+	if (v === true) return true;
+	return false;
+}
+
+function allowedFeishuTenantKeys(c) {
+	const raw = c.env.FEISHU_ALLOWED_TENANT_KEYS ?? c.env.feishu_allowed_tenant_keys ?? '';
+	return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function extractTenantKeyFromPayload(data) {
+	if (!data || typeof data !== 'object') return undefined;
+	const inner = data.data;
+	if (inner && typeof inner === 'object' && 'tenant_key' in inner) {
+		const tk = inner.tenant_key;
+		if (tk != null && String(tk)) return String(tk);
+	}
+	const tk = data.tenant_key;
+	if (tk != null && String(tk)) return String(tk);
+	return undefined;
+}
+
+function extractTenantKeyFromUser(u) {
+	if (!u || typeof u !== 'object') return undefined;
+	const tk = u.tenant_key;
+	if (tk != null && String(tk)) return String(tk);
+	return undefined;
+}
+
+function assertFeishuTenantAllowed(c, tokenData, userU) {
+	if (!feishuSwitchOn(c)) return;
+
+	const allowed = allowedFeishuTenantKeys(c);
+	if (allowed.length === 0) {
+		throw new BizError(t('feishuTenantAllowlistMissing'), 403);
+	}
+
+	let tenantKey = extractTenantKeyFromPayload(tokenData) ?? extractTenantKeyFromUser(userU);
+	if (!tenantKey) {
+		throw new BizError(t('feishuTenantKeyMissing'), 403);
+	}
+
+	if (!new Set(allowed).has(tenantKey)) {
+		throw new BizError(t('feishuTenantNotAllowed'), 403);
+	}
+}
 
 const oauthService = {
 
 	async bindUser(c, params) {
 
-		const { email, oauthUserId, code } = params;
+		const { email, oauthUserId } = params;
 
 		const oauthRow = await this.getById(c, oauthUserId);
 
@@ -20,7 +70,7 @@ const oauthService = {
 			throw new BizError('用户已绑定有邮箱')
 		}
 
-		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd(), code }, true);
+		await loginService.register(c, { email, password: cryptoUtils.genRandomPwd() }, true, true);
 
 		userRow = await userService.selectByEmail(c, email);
 
@@ -30,23 +80,20 @@ const oauthService = {
 		return { userInfo: oauthRow, token: jwtToken}
 	},
 
-	async linuxDoLogin(c, params) {
+	async feishuLogin(c, params) {
 
 		const { code } = params;
 
-		let token = '';
-		let userInfo = {}
-
 		const reqParams = new URLSearchParams()
-		reqParams.append('client_id', c.env.linuxdo_client_id)
-		reqParams.append('client_secret', c.env.linuxdo_client_secret)
-		reqParams.append('code', code)
-		reqParams.append('redirect_uri', c.env.linuxdo_callback_url)
 		reqParams.append('grant_type', 'authorization_code')
+		reqParams.append('client_id', c.env.feishu_app_id)
+		reqParams.append('client_secret', c.env.feishu_app_secret)
+		reqParams.append('code', code)
+		reqParams.append('redirect_uri', c.env.feishu_redirect_uri)
 
-		const tokenRes = await fetch("https://connect.linux.do/oauth2/token", {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+		const tokenRes = await fetch('https://open.feishu.cn/open-apis/authen/v2/oauth/token', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 			body: reqParams.toString()
 		})
 
@@ -54,27 +101,37 @@ const oauthService = {
 			throw new BizError(tokenRes.statusText)
 		}
 
-		token = await tokenRes.json()
+		const tokenData = await tokenRes.json()
+		const accessToken = tokenData.access_token
+			?? tokenData.data?.access_token
+		if (!accessToken) {
+			throw new BizError('飞书授权失败：无法获取 access_token')
+		}
 
-		const userRes = await fetch('https://connect.linux.do/api/user', {
-			headers: {
-				Authorization: 'Bearer ' + token.access_token
-			}
-		});
+		const userRes = await fetch('https://open.feishu.cn/open-apis/authen/v1/user_info', {
+			headers: { Authorization: 'Bearer ' + accessToken }
+		})
 
 		if (!userRes.ok) {
 			throw new BizError(userRes.statusText)
 		}
 
-		userInfo = await userRes.json();
+		const userData = await userRes.json()
+		const u = userData.data ?? userData
 
-		userInfo.oauthUserId = String(userInfo.id);
-		userInfo.active = userInfo.active ? 0 : 1;
-		userInfo.silenced = userInfo.active ? 0 : 1;
-		userInfo.trustLevel = userInfo.trust_level;
-		userInfo.avatar = userInfo.avatar_url;
+		assertFeishuTenantAllowed(c, tokenData, u)
 
-		const  oauthRow = await this.saveUser(c, userInfo);
+		const userInfo = {
+			oauthUserId: String(u.user_id ?? u.open_id ?? u.sub ?? ''),
+			username: String(u.name ?? ''),
+			name: String(u.name ?? ''),
+			avatar: String(u.avatar_url ?? u.picture ?? ''),
+			active: 0,
+			trustLevel: 0,
+			silenced: 0,
+		}
+
+		const oauthRow = await this.saveUser(c, userInfo);
 		const userRow = await userService.selectByIdIncludeDel(c, oauthRow.userId);
 
 		if (!userRow) {

@@ -22,7 +22,7 @@ import verifyRecordService from './verify-record-service';
 
 const loginService = {
 
-	async register(c, params, oauth = false) {
+	async register(c, params, oauth = false, trustedFeishuBind = false) {
 
 		const { email, password, token, code } = params;
 
@@ -31,10 +31,6 @@ const loginService = {
 		if (oauth) {
 			registerVerify = settingConst.registerVerify.CLOSE;
 			register = settingConst.register.OPEN;
-		}
-
-		if (register === settingConst.register.CLOSE) {
-			throw new BizError(t('regDisabled'));
 		}
 
 		if (!verifyUtils.isEmail(email)) {
@@ -65,22 +61,35 @@ const loginService = {
 			throw new BizError(t('notEmailDomain'));
 		}
 
+		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
+		const trustedAdminBootstrap = email === c.env.admin && !accountRow;
+		const trustedRegistration = trustedFeishuBind || trustedAdminBootstrap;
+
+		if (register === settingConst.register.CLOSE && !trustedRegistration) {
+			throw new BizError(t('regDisabled'));
+		}
+
+		if (register === settingConst.register.CLOSE && trustedRegistration) {
+			register = settingConst.register.OPEN;
+			registerVerify = settingConst.registerVerify.CLOSE;
+		}
+
 		let type = null;
 		let regKeyId = 0
 
-		if (regKey === settingConst.regKey.OPEN) {
-			const result = await this.handleOpenRegKey(c, regKey, code)
-			type = result?.type
-			regKeyId = result?.regKeyId
-		}
+		if (!trustedRegistration) {
+			if (regKey === settingConst.regKey.OPEN) {
+				const result = await this.handleOpenRegKey(c, regKey, code)
+				type = result?.type
+				regKeyId = result?.regKeyId
+			}
 
-		if (regKey === settingConst.regKey.OPTIONAL) {
-			const result = await this.handleOpenOptional(c, regKey, code)
-			type = result?.type
-			regKeyId = result?.regKeyId
+			if (regKey === settingConst.regKey.OPTIONAL) {
+				const result = await this.handleOpenOptional(c, regKey, code)
+				type = result?.type
+				regKeyId = result?.regKeyId
+			}
 		}
-
-		const accountRow = await accountService.selectByEmailIncludeDel(c, email);
 
 		if (accountRow && accountRow.isDel === isDel.DELETE) {
 			throw new BizError(t('isDelUser'));

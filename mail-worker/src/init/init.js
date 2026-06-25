@@ -28,8 +28,23 @@ const dbInit = {
 		await this.v2_7DB(c);
 		await this.v2_8DB(c);
 		await this.v2_9DB(c);
+		await this.v2_10DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v2_10DB(c) {
+		try {
+			// reg_key: 1=CLOSE 不要求注册码 → 改为 0=OPEN，与内部部署默认一致（公开注册可在后台改回关闭/可选）
+			await c.env.db.prepare(`UPDATE setting SET reg_key = 0 WHERE reg_key = 1`).run();
+		} catch (e) {
+			console.warn(`跳过迁移 v2_10 reg_key: ${e.message}`);
+		}
+		try {
+			await c.env.db.prepare(`UPDATE role SET send_type = 'day', send_count = 500 WHERE role_id = 1 AND send_type = 'ban'`).run();
+		} catch (e) {
+			console.warn(`跳过迁移 v2_10 role send: ${e.message}`);
+		}
 	},
 
 	async v2_9DB(c) {
@@ -160,11 +175,6 @@ const dbInit = {
 	},
 
 	async v1_6DB(c) {
-
-		const noticeContent = '本项目仅供学习交流，禁止用于违法业务\n' +
-			'<br>\n' +
-			'请遵守当地法规，作者不承担任何法律责任'
-
 		const ADD_COLUMN_SQL_LIST = [
 			`ALTER TABLE setting ADD COLUMN reg_verify_count INTEGER NOT NULL DEFAULT 1;`,
 			`ALTER TABLE setting ADD COLUMN add_verify_count INTEGER NOT NULL DEFAULT 1;`,
@@ -197,7 +207,6 @@ const dbInit = {
 		});
 
 		await Promise.all(promises);
-		await c.env.db.prepare(`UPDATE setting SET notice_content = ? WHERE notice_content = '';`).bind(noticeContent).run();
 		try {
 			await c.env.db.batch([
 				c.env.db.prepare(`DROP INDEX IF EXISTS idx_account_email`),
@@ -256,7 +265,7 @@ const dbInit = {
 		}
 
 		const ADD_COLUMN_SQL_LIST = [
-			`ALTER TABLE setting ADD COLUMN reg_key INTEGER NOT NULL DEFAULT 1;`,
+			`ALTER TABLE setting ADD COLUMN reg_key INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE role ADD COLUMN ban_email TEXT NOT NULL DEFAULT '';`,
 			`ALTER TABLE role ADD COLUMN ban_email_type INTEGER NOT NULL DEFAULT 0;`,
 			`ALTER TABLE user ADD COLUMN reg_key_id INTEGER NOT NULL DEFAULT 0;`
@@ -463,7 +472,7 @@ const dbInit = {
         INSERT INTO role (
           role_id, name, key, create_time, sort, description, user_id, is_default, send_count, send_type, account_count
         ) VALUES (
-          1, '普通用户', NULL, '0000-00-00 00:00:00', 0, '只有普通使用权限', 0, 1, NULL, 'ban', 10
+          1, '普通用户', NULL, '0000-00-00 00:00:00', 0, '只有普通使用权限', 0, 1, 500, 'day', 10
         )
       `).run();
 		}

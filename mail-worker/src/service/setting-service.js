@@ -48,18 +48,16 @@ const settingService = {
 		setting.domainList = domainList;
 
 
-		let linuxdoSwitch = c.env.linuxdo_switch;
+		let feishuSwitch = c.env.feishu_switch;
 		let projectLink = c.env.project_link;
 
-		if (typeof linuxdoSwitch === 'string' && linuxdoSwitch === 'true') {
-			linuxdoSwitch = true
-		} else if (linuxdoSwitch === true) {
-			linuxdoSwitch = true
+		if (typeof feishuSwitch === 'string' && feishuSwitch === 'true') {
+			feishuSwitch = true
+		} else if (feishuSwitch === true) {
+			feishuSwitch = true
 		} else {
-			linuxdoSwitch = false
+			feishuSwitch = false
 		}
-
-		console.log(projectLink)
 
 		if (typeof projectLink === 'string' && projectLink === 'false') {
 			projectLink = false
@@ -71,9 +69,9 @@ const settingService = {
 
 		setting.projectLink = projectLink;
 
-		setting.linuxdoClientId = c.env.linuxdo_client_id;
-		setting.linuxdoCallbackUrl = c.env.linuxdo_callback_url;
-		setting.linuxdoSwitch = linuxdoSwitch;
+		setting.feishuAppId = c.env.feishu_app_id;
+		setting.feishuRedirectUri = c.env.feishu_redirect_uri;
+		setting.feishuSwitch = feishuSwitch;
 
 		setting.emailPrefixFilter = setting.emailPrefixFilter.split(",").filter(Boolean);
 
@@ -214,9 +212,9 @@ const settingService = {
 			noticeOffset: settingRow.noticeOffset,
 			notice: settingRow.notice,
 			loginDomain: settingRow.loginDomain,
-			linuxdoClientId: settingRow.linuxdoClientId,
-			linuxdoCallbackUrl: settingRow.linuxdoCallbackUrl,
-			linuxdoSwitch: settingRow.linuxdoSwitch,
+			feishuAppId: settingRow.feishuAppId,
+			feishuRedirectUri: settingRow.feishuRedirectUri,
+			feishuSwitch: settingRow.feishuSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix,
 			projectLink: settingRow.projectLink
 		};

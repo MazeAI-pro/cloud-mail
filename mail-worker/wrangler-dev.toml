@@ -31,6 +31,7 @@ run_worker_first = true
 
 [vars]
 orm_log = false
-domain = ["example.com", "example2.com", "example3.com", "example4.com"]
-admin = "admin@example.com"
-jwt_secret = "b7f29a1d-18e2-4d3b-941f-f6b2c97c02fd"
+domain = ["mazeai.pro"]
+admin = "admin@mazeai.pro"
+# jwt_secret、飞书敏感项见 .dev.vars（本地，已 gitignore），勿提交
+# 线上：wrangler secret put jwt_secret（以及 feishu_app_secret 等）
