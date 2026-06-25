@@ -26,6 +26,11 @@ jobs:
       LINUXDO_CLIENT_SECRET: ${{ secrets.LINUXDO_CLIENT_SECRET || vars.LINUXDO_CLIENT_SECRET }}
       LINUXDO_CALLBACK_URL: ${{ secrets.LINUXDO_CALLBACK_URL || vars.LINUXDO_CALLBACK_URL }}
       LINUXDO_SWITCH: ${{ secrets.LINUXDO_SWITCH || vars.LINUXDO_SWITCH }}
+      FEISHU_SWITCH: ${{ secrets.FEISHU_SWITCH || vars.FEISHU_SWITCH || 'false' }}
+      FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID || vars.FEISHU_APP_ID }}
+      FEISHU_REDIRECT_URI: ${{ secrets.FEISHU_REDIRECT_URI || vars.FEISHU_REDIRECT_URI }}
+      FEISHU_ALLOWED_TENANT_KEYS: ${{ secrets.FEISHU_ALLOWED_TENANT_KEYS || vars.FEISHU_ALLOWED_TENANT_KEYS }}
+      FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET || vars.FEISHU_APP_SECRET }}
       PEOPLE_HIRE_MAILBOX: ${{ secrets.PEOPLE_HIRE_MAILBOX || vars.PEOPLE_HIRE_MAILBOX || 'hire@mazeai.pro' }}
       PEOPLE_INBOUND_URL: ${{ secrets.PEOPLE_INBOUND_URL || vars.PEOPLE_INBOUND_URL || 'https://people.mazeai.pro/api/internal/mail/inbound' }}
       CLOUDMAIL_PEOPLE_TOKEN: ${{ secrets.CLOUDMAIL_PEOPLE_TOKEN || secrets.PEOPLE_INBOUND_TOKEN }}
@@ -106,6 +111,13 @@ jobs:
           if [ -z "$LINUXDO_CLIENT_ID" ] || [ -z "$LINUXDO_CLIENT_SECRET" ]; then
             sed -i '/^linuxdo_client_id = /,/^linuxdo_switch = /d' "$CONFIG_FILE"
           fi
+
+          if [ "$FEISHU_SWITCH" != "true" ]; then
+            sed -i '/^feishu_switch = /,/^FEISHU_ALLOWED_TENANT_KEYS = /d' "$CONFIG_FILE"
+          elif [ -z "$FEISHU_APP_ID" ] || [ -z "$FEISHU_REDIRECT_URI" ] || [ -z "$FEISHU_ALLOWED_TENANT_KEYS" ] || [ -z "$FEISHU_APP_SECRET" ]; then
+            echo "❌ FEISHU_SWITCH is true, but FEISHU_APP_ID, FEISHU_REDIRECT_URI, FEISHU_ALLOWED_TENANT_KEYS, or FEISHU_APP_SECRET is missing."
+            exit 1
+          fi
           
           # 自定义域名已在 Cloudflare Dashboard 绑定，部署时跳过 [[routes]] 避免 Zone 权限报错
           sed -i '/\[\[routes\]\]/,/^$/d' "$CONFIG_FILE"
@@ -121,6 +133,10 @@ jobs:
           sed -i "s|\${LINUXDO_CLIENT_SECRET}|${LINUXDO_CLIENT_SECRET}|g" "$CONFIG_FILE"
           sed -i "s|\${LINUXDO_CALLBACK_URL}|${LINUXDO_CALLBACK_URL}|g" "$CONFIG_FILE"
           sed -i "s|\${LINUXDO_SWITCH}|${LINUXDO_SWITCH}|g" "$CONFIG_FILE"
+          sed -i "s|\${FEISHU_SWITCH}|${FEISHU_SWITCH}|g" "$CONFIG_FILE"
+          sed -i "s|\${FEISHU_APP_ID}|${FEISHU_APP_ID}|g" "$CONFIG_FILE"
+          sed -i "s|\${FEISHU_REDIRECT_URI}|${FEISHU_REDIRECT_URI}|g" "$CONFIG_FILE"
+          sed -i "s|\${FEISHU_ALLOWED_TENANT_KEYS}|${FEISHU_ALLOWED_TENANT_KEYS}|g" "$CONFIG_FILE"
           sed -i "s|\${PEOPLE_HIRE_MAILBOX}|${PEOPLE_HIRE_MAILBOX}|g" "$CONFIG_FILE"
           sed -i "s|\${PEOPLE_INBOUND_URL}|${PEOPLE_INBOUND_URL}|g" "$CONFIG_FILE"
           
@@ -237,6 +253,13 @@ jobs:
             echo "✅ cloudmail_people_token injected."
           else
             echo "⚠️  CLOUDMAIL_PEOPLE_TOKEN not set, skipping cloudmail_people_token secret."
+          fi
+
+          if [ -n "${FEISHU_APP_SECRET:-}" ]; then
+            printf '%s' "$FEISHU_APP_SECRET" | pnpm wrangler secret put feishu_app_secret -c wrangler-action.toml
+            echo "✅ feishu_app_secret injected."
+          else
+            echo "⚠️  FEISHU_APP_SECRET not set, skipping feishu_app_secret secret."
           fi
 
       - name: ♻️ 初始化数据库 / Initialize database

@@ -43,6 +43,11 @@ linuxdo_client_secret = "${LINUXDO_CLIENT_SECRET}"
 linuxdo_callback_url = "${LINUXDO_CALLBACK_URL}"
 linuxdo_switch = "${LINUXDO_SWITCH}"
 
+feishu_switch = "${FEISHU_SWITCH}"
+feishu_app_id = "${FEISHU_APP_ID}"
+feishu_redirect_uri = "${FEISHU_REDIRECT_URI}"
+FEISHU_ALLOWED_TENANT_KEYS = "${FEISHU_ALLOWED_TENANT_KEYS}"
+
 # people（Maze·小觅）集成：hire@ 收件回调 + 出站发信鉴权
 # cloudmail_people_token 通过 wrangler secret put 注入（不落 toml）
 people_hire_mailbox = "${PEOPLE_HIRE_MAILBOX}"
