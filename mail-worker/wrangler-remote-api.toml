@@ -37,3 +37,4 @@ FEISHU_ALLOWED_TENANT_KEYS = "1bafe4d68b0bd75e"
 
 people_hire_mailbox = "hire@mazeai.pro"
 people_inbound_url = "https://people.mazeai.pro/api/internal/mail/inbound"
+people_worker_origin = "https://mail.mazeai.pro"

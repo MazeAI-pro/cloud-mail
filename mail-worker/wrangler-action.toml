@@ -52,6 +52,7 @@ FEISHU_ALLOWED_TENANT_KEYS = "${FEISHU_ALLOWED_TENANT_KEYS}"
 # cloudmail_people_token 通过 wrangler secret put 注入（不落 toml）
 people_hire_mailbox = "${PEOPLE_HIRE_MAILBOX}"
 people_inbound_url = "${PEOPLE_INBOUND_URL}"
+people_worker_origin = "${PEOPLE_WORKER_ORIGIN}"
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

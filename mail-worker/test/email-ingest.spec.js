@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { emailConst, settingConst } from '../src/const/entity-const';
 import { readMessageRaw, resolveReceiveStatus } from '../src/email/email';
 import r2Service from '../src/service/r2-service';
+import peopleService from '../src/service/people-service';
 
 function streamFromParts(parts) {
 	return new ReadableStream({
@@ -66,5 +67,16 @@ describe('inbound email ingest', () => {
 		expect(response.status).toBe(200);
 		expect(response.headers.get('Content-Type')).toBe('application/pdf');
 		expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual(Array.from(objectBytes));
+	});
+
+	it('builds absolute people attachment URLs from the worker origin when r2 domain is unset', () => {
+		const url = peopleService.buildAttachmentUrl(
+			{ people_worker_origin: 'https://mail.mazeai.pro/' },
+			null,
+			null,
+			'attachments/resume.pdf',
+		);
+
+		expect(url).toBe('https://mail.mazeai.pro/attachments/resume.pdf');
 	});
 });

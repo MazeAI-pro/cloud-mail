@@ -50,6 +50,7 @@ FEISHU_ALLOWED_TENANT_KEYS = "1bafe4d68b0bd75e"
 # cloudmail_people_token 建议用 wrangler secret 注入（勿提交密钥）
 people_hire_mailbox = "hire@mazeai.pro"
 people_inbound_url = "https://people.mazeai.pro/api/internal/mail/inbound"
+people_worker_origin = "https://mail.mazeai.pro"
 
 [build]
 command = "pnpm --prefix ../mail-vue install && pnpm --prefix ../mail-vue run build"

@@ -33,6 +33,7 @@ jobs:
       FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET || vars.FEISHU_APP_SECRET }}
       PEOPLE_HIRE_MAILBOX: ${{ secrets.PEOPLE_HIRE_MAILBOX || vars.PEOPLE_HIRE_MAILBOX || 'hire@mazeai.pro' }}
       PEOPLE_INBOUND_URL: ${{ secrets.PEOPLE_INBOUND_URL || vars.PEOPLE_INBOUND_URL || 'https://people.mazeai.pro/api/internal/mail/inbound' }}
+      PEOPLE_WORKER_ORIGIN: ${{ secrets.PEOPLE_WORKER_ORIGIN || vars.PEOPLE_WORKER_ORIGIN || 'https://mail.mazeai.pro' }}
       CLOUDMAIL_PEOPLE_TOKEN: ${{ secrets.CLOUDMAIL_PEOPLE_TOKEN || secrets.PEOPLE_INBOUND_TOKEN }}
 
     outputs:
@@ -139,6 +140,7 @@ jobs:
           sed -i "s|\${FEISHU_ALLOWED_TENANT_KEYS}|${FEISHU_ALLOWED_TENANT_KEYS}|g" "$CONFIG_FILE"
           sed -i "s|\${PEOPLE_HIRE_MAILBOX}|${PEOPLE_HIRE_MAILBOX}|g" "$CONFIG_FILE"
           sed -i "s|\${PEOPLE_INBOUND_URL}|${PEOPLE_INBOUND_URL}|g" "$CONFIG_FILE"
+          sed -i "s|\${PEOPLE_WORKER_ORIGIN}|${PEOPLE_WORKER_ORIGIN}|g" "$CONFIG_FILE"
           
           echo "✅ Environment setup completed."
 
