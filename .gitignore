@@ -26,3 +26,4 @@ mail-vue/dist
 .wrangler
 mail-worker/.dev.vars
 .venv
+.worktrees/
