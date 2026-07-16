@@ -18,9 +18,9 @@ app.post('/people/sendEmail', async (c) => {
 		return c.json({ error: 'not_found' }, 404);
 	}
 
-	const from = peopleService.hireMailbox(c.env);
+	const from = peopleService.sendMailbox(c.env);
 	if (!from) {
-		return c.json(result.fail('hire mailbox not configured'), 503);
+		return c.json(result.fail('people send mailbox not configured'), 503);
 	}
 
 	const params = await c.req.json();

@@ -46,9 +46,10 @@ feishu_app_id = "cli_a9785c47ccb8dcbb"
 feishu_redirect_uri = "https://mail.mazeai.pro/login"
 FEISHU_ALLOWED_TENANT_KEYS = "1bafe4d68b0bd75e"
 
-# people（Maze·小觅）集成：hire@ 收件回调 + 出站发信鉴权
+# people（Maze·小觅）集成：hire@ 收件回调 + hr@ 出站发信鉴权
 # cloudmail_people_token 建议用 wrangler secret 注入（勿提交密钥）
 people_hire_mailbox = "hire@mazeai.pro"
+people_send_mailbox = "hr@mazeai.pro"
 people_inbound_url = "https://people.mazeai.pro/api/internal/mail/inbound"
 people_worker_origin = "https://mail.mazeai.pro"
 

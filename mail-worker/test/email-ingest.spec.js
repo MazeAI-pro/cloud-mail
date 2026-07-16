@@ -79,4 +79,15 @@ describe('inbound email ingest', () => {
 
 		expect(url).toBe('https://mail.mazeai.pro/attachments/resume.pdf');
 	});
+
+	it('keeps the People inbound and outbound mailboxes separate', () => {
+		const workerEnv = {
+			domain: ['mazeai.pro'],
+			people_hire_mailbox: 'hire@mazeai.pro',
+			people_send_mailbox: 'hr@mazeai.pro',
+		};
+
+		expect(peopleService.hireMailbox(workerEnv)).toBe('hire@mazeai.pro');
+		expect(peopleService.sendMailbox(workerEnv)).toBe('hr@mazeai.pro');
+	});
 });

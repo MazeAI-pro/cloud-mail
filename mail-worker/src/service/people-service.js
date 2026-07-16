@@ -40,6 +40,22 @@ const peopleService = {
 		return domain ? `hire@${domain}` : null;
 	},
 
+	sendMailbox(env) {
+		if (env.people_send_mailbox) {
+			return env.people_send_mailbox;
+		}
+		let domainList = env.domain;
+		if (typeof domainList === 'string') {
+			try {
+				domainList = JSON.parse(domainList);
+			} catch {
+				domainList = [domainList];
+			}
+		}
+		const domain = Array.isArray(domainList) ? domainList[0] : null;
+		return domain ? `hr@${domain}` : null;
+	},
+
 	/**
 	 * 用 hash key 构造附件的可公开访问 URL。
 	 * 优先用配置的 r2Domain（OSS 自定义域），否则回落到 worker 自身 origin 的 /attachments/ 路径。
