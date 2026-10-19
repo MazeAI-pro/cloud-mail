@@ -297,3 +297,5 @@ FEISHU_ALLOWED_TENANT_KEYS = "tenant_key_1,tenant_key_2"
 
 
 
+
+受管邮箱 API 的本地实现说明（未发布）：[managed-mailbox-api.md](mail-worker/docs/managed-mailbox-api.md)。

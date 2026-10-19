@@ -29,9 +29,24 @@ const dbInit = {
 		await this.v2_8DB(c);
 		await this.v2_9DB(c);
 		await this.v2_10DB(c);
+    await this.v2_11DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
+
+  async v2_11DB(c) {
+    const column = await c.env.db.prepare("SELECT name FROM pragma_table_info('account') WHERE name = 'external_key'").first();
+    if (!column) {
+      try {
+        await c.env.db.prepare('ALTER TABLE account ADD COLUMN external_key TEXT').run();
+      } catch (error) {
+        // Another initializer may have added the column after the schema check.
+        const added = await c.env.db.prepare("SELECT name FROM pragma_table_info('account') WHERE name = 'external_key'").first();
+        if (!added) throw error;
+      }
+    }
+    await c.env.db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_account_external_key ON account(external_key)').run();
+  },
 
 	async v2_10DB(c) {
 		try {

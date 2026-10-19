@@ -1,7 +1,7 @@
 import BizError from '../error/biz-error';
 import orm from '../entity/orm';
 import { v4 as uuidv4 } from 'uuid';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, sql } from 'drizzle-orm';
 import saltHashUtils from '../utils/crypto-utils';
 import cryptoUtils from '../utils/crypto-utils';
 import emailUtils from '../utils/email-utils';
@@ -18,14 +18,26 @@ import settingService from './setting-service';
 import emailService from './email-service';
 import KvConst from '../const/kv-const';
 import { Resend } from 'resend';
+import managedMailboxService from './managed-mailbox-service';
 
 const publicService = {
 
+  async ensureMailbox(c, params) {
+    return managedMailboxService.ensureMailbox(c, params);
+  },
+
+  async attachment(c, params) {
+    return managedMailboxService.attachment(c, params);
+  },
+
 	async emailList(c, params) {
+
+    const scope = await managedMailboxService.listScope(c, params);
 
 		let { toEmail, content, subject, sendName, sendEmail, timeSort, num, size, type , isDel } = params
 
 		const query = orm(c).select({
+				...(scope ? { messageId: email.messageId, inReplyTo: email.inReplyTo, relation: email.relation, recipient: email.recipient } : {}),
 				emailId: email.emailId,
 				sendEmail: email.sendEmail,
 				sendName: email.name,
@@ -38,6 +50,11 @@ const publicService = {
 				text: email.text,
 				isDel: email.isDel,
 		}).from(email)
+
+    if (scope) {
+      size = scope.size;
+      num = scope.num;
+    }
 
 		if (!size) {
 			size = 20
@@ -53,6 +70,16 @@ const publicService = {
 		num = (num - 1) * size;
 
 		let conditions = []
+
+    if (scope) {
+      conditions.push(eq(email.userId, scope.owner.userId), eq(email.accountId, scope.owner.accountId), eq(email.isDel, 0));
+      if (params.direction !== undefined) conditions.push(eq(email.type, params.direction === 'inbound' ? emailConst.type.RECEIVE : emailConst.type.SEND));
+      if (scope.emailId !== undefined) conditions.push(eq(email.emailId, scope.emailId));
+      if (scope.afterEmailId !== undefined) conditions.push(gt(email.emailId, scope.afterEmailId));
+      if (params.messageId !== undefined) conditions.push(eq(email.messageId, params.messageId));
+      if (params.inReplyTo !== undefined) conditions.push(eq(email.inReplyTo, params.inReplyTo));
+      if (scope.since) conditions.push(sql`julianday(${email.createTime}) >= julianday(${scope.since})`);
+    }
 
 		if (toEmail) {
 			conditions.push(sql`${email.toEmail} COLLATE NOCASE LIKE ${toEmail}`)
@@ -94,7 +121,9 @@ const publicService = {
 			query.orderBy(desc(email.emailId));
 		}
 
-		return query.limit(size).offset(num);
+    const rows = await query.limit(size).offset(num);
+    if (scope) await managedMailboxService.addAttachments(c, rows, scope.owner);
+    return rows;
 
 	},
 

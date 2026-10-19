@@ -21,3 +21,12 @@ app.post('/public/sendEmail', async (c) => {
 	const data = await publicService.sendEmail(c, await c.req.json());
 	return c.json(result.ok(data));
 });
+
+app.post('/public/ensureMailbox', async (c) => {
+  const data = await publicService.ensureMailbox(c, await c.req.json());
+  return c.json(result.ok(data));
+});
+
+app.post('/public/attachment', async (c) => {
+  return publicService.attachment(c, await c.req.json());
+});
