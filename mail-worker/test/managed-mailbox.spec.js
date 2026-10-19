@@ -192,6 +192,30 @@ describe('scoped mailbox queries', () => {
     expect(await publicService.emailList(c, { toEmail: address })).toHaveLength(1);
   });
 
+  it.each([99, 100])('returns %i scoped rows with empty and owned attachment metadata within D1 limits', async size => {
+    const { address } = await ensure();
+    const owner = await env.db.prepare('SELECT account_id, user_id FROM account WHERE email = ?').bind(address).first();
+    const { results: inserted } = await env.db.prepare(`WITH RECURSIVE sequence(n) AS (
+      SELECT 1 UNION ALL SELECT n + 1 FROM sequence WHERE n < ?
+    ) INSERT INTO email (account_id,user_id,send_email,to_email,subject,text,content,type)
+      SELECT ?,?,'sender@example.org',?,'subject','body text','<p>body text</p>',0 FROM sequence RETURNING email_id`)
+      .bind(size, owner.account_id, owner.user_id, address).all();
+    const firstEmailId = inserted[0].email_id;
+    const lastEmailId = inserted.at(-1).email_id;
+    await env.db.batch([firstEmailId, lastEmailId].map(emailId => env.db.prepare(`INSERT INTO attachments
+      (user_id,email_id,account_id,key,filename,mime_type,size) VALUES (?,?,?,?,?,?,?)`)
+      .bind(owner.user_id, emailId, owner.account_id, `attachments/${emailId}.pdf`, `${emailId}.pdf`, 'application/pdf', 4)));
+    await env.db.prepare(`INSERT INTO attachments (user_id,email_id,account_id,key,filename)
+      VALUES (?,?,?,?,?)`).bind(owner.user_id + 1, lastEmailId, owner.account_id + 1, 'attachments/foreign.pdf', 'foreign.pdf').run();
+    const rows = await publicService.emailList(c, { ownerEmail: address, direction: 'inbound', size, timeSort: 'asc' });
+    expect(rows).toHaveLength(size);
+    expect(rows[0]).toMatchObject({ emailId: firstEmailId, attachments: [{ attId: expect.any(Number), filename: `${firstEmailId}.pdf`, mimeType: 'application/pdf', size: 4, disposition: null, contentId: null, type: 0 }] });
+    expect(rows.at(-1)).toMatchObject({ emailId: lastEmailId, attachments: [{ attId: expect.any(Number), filename: `${lastEmailId}.pdf`, mimeType: 'application/pdf', size: 4, disposition: null, contentId: null, type: 0 }] });
+    expect(rows.slice(1, -1).every(row => row.attachments.length === 0)).toBe(true);
+    expect(JSON.stringify(rows)).not.toContain('foreign.pdf');
+    expect(JSON.stringify(rows)).not.toContain('attachments/');
+  });
+
   it('fails closed for new filters missing an owner or malformed scope', async () => {
     for (const params of [{ direction: 'inbound' }, { emailId: 1 }, { messageId: 'a' }, { inReplyTo: 'a' }, { since: '2026-01-01T00:00:00Z' }, { afterEmailId: 0 }]) {
       await expect(publicService.emailList(c, params)).rejects.toThrow('ownerEmail');

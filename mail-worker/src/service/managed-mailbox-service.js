@@ -6,6 +6,8 @@ import r2Service from './r2-service';
 const MAILBOX_DOMAIN = 'mazeai.pro';
 const ADDRESS_COUNT = 90000000;
 const MAX_CREATE_ATTEMPTS = 10;
+// Reserve two of D1's 100 SQL variables for exact mailbox ownership.
+const ATTACHMENT_QUERY_BATCH_SIZE = 98;
 const EXTERNAL_KEY_PATTERN = /^tada:[A-Za-z0-9_-]{1,48}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ACCOUNT_SELECT = `SELECT a.email AS address, a.account_id AS accountId, a.user_id AS userId,
   a.status AS accountStatus, a.is_del AS accountDeleted, u.user_id AS ownerId,
@@ -124,12 +126,15 @@ const managedMailboxService = {
 
   async addAttachments(c, rows, owner) {
     if (!rows.length) return;
-    const placeholders = rows.map(() => '?').join(',');
-    const { results } = await c.env.db.prepare(`SELECT att_id AS attId, email_id AS emailId, filename,
-      mime_type AS mimeType, size, disposition, content_id AS contentId, type FROM attachments
-      WHERE user_id = ? AND account_id = ? AND status = 0 AND email_id IN (${placeholders})`)
-      .bind(owner.userId, owner.accountId, ...rows.map(row => row.emailId)).all();
-    for (const row of rows) row.attachments = results.filter(att => att.emailId === row.emailId).map(({ emailId, ...metadata }) => metadata);
+    for (let offset = 0; offset < rows.length; offset += ATTACHMENT_QUERY_BATCH_SIZE) {
+      const batch = rows.slice(offset, offset + ATTACHMENT_QUERY_BATCH_SIZE);
+      const placeholders = batch.map(() => '?').join(',');
+      const { results } = await c.env.db.prepare(`SELECT att_id AS attId, email_id AS emailId, filename,
+        mime_type AS mimeType, size, disposition, content_id AS contentId, type FROM attachments
+        WHERE user_id = ? AND account_id = ? AND status = 0 AND email_id IN (${placeholders})`)
+        .bind(owner.userId, owner.accountId, ...batch.map(row => row.emailId)).all();
+      for (const row of batch) row.attachments = results.filter(att => att.emailId === row.emailId).map(({ emailId, ...metadata }) => metadata);
+    }
   },
 
   async attachment(c, params) {
