@@ -24,6 +24,24 @@ describe('mytada deployment boundary', () => {
   it.each(['/api/register', '/api/init/secret', '/api/oauth/bindUser', '/api/people/sendEmail', '/api/test', '/api/telegram', '/api/oss/attachments/a', '/attachments/a', '/api/webhooks'])('blocks legacy route %s without touching bindings', async path => {
     expect((await worker.fetch(request(path), {}, {})).status).toBe(404);
   });
+  it.each([
+    '/api/%6fss/attachments/private.pdf', '/api/%70ublic/emailList', '/api/%69nit/secret',
+    '/api/%72egister', '/api/%6fauth/bindUser', '/%61pi/oss/attachments/private.pdf',
+    '/%61pi/public/emailList', '/api/%256fss/attachments/private.pdf', '/api%2foss/attachments/private.pdf',
+    '/api/%2e%2e/%6fss/attachments/private.pdf', '/api/%ZZ', '/api/%',
+  ])('rejects ambiguous encoded path %s before legacy routing or storage access', async path => {
+    const r2 = { get: vi.fn(async () => { throw new Error('Private object must not be read'); }) };
+    const db = { prepare: vi.fn(() => { throw new Error('Legacy initializer must not run'); }) };
+    const assets = { fetch: vi.fn(() => new Response('Unexpected asset fallback')) };
+    const response = await worker.fetch(request(path), { r2, db, assets }, {});
+    expect(response.status).toBe(400);
+    expect(r2.get).not.toHaveBeenCalled();
+    expect(db.prepare).not.toHaveBeenCalled();
+    expect(assets.fetch).not.toHaveBeenCalled();
+  });
+  it('does not mistake encoded query values for encoded paths', async () => {
+    expect((await worker.fetch(request('/health/live?value=%61'), {}, {})).status).toBe(200);
+  });
   it.each([undefined, '', 'wrong'])('fails closed for missing or invalid API secret (%s)', async secret => {
     expect((await worker.fetch(request('/api/public/emailList'), { managed_api_token: secret }, {})).status).toBe(401);
   });

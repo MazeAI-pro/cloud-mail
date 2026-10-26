@@ -64,6 +64,8 @@ export async function readiness(env) {
 export default {
   async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname;
+    // Hono decodes paths after dispatch. Reject encoded paths before either router sees them.
+    if (path.includes('%')) return new Response('Invalid path', { status: 400 });
     if (path === '/health/live') {
       return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
     }
