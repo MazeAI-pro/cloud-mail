@@ -17,7 +17,11 @@ managedApp.onError((error, c) => {
 });
 for (const [path, method] of Object.entries(PUBLIC_METHODS)) {
   managedApp.post(`/api/public/${path}`, async c => {
-    const response = await publicService[method](c, await c.req.json());
+    const params = await c.req.json();
+    if (method === 'emailList' && (typeof params?.ownerEmail !== 'string' || !params.ownerEmail.trim())) {
+      return c.json({ code: 400, message: 'ownerEmail is required' }, 400);
+    }
+    const response = await publicService[method](c, params);
     return response instanceof Response ? response : c.json(result.ok(response));
   });
 }

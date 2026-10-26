@@ -261,4 +261,28 @@ describe('isolated mytada entrypoint integration', () => {
     expect(payload.data.address).toMatch(/^u[1-9]\d{7}@mytada\.ai$/);
     expect(await env.kv.get('public_key:')).toBe('local-public-token');
   });
+
+  it('requires an owner and never returns another mailbox through the isolated list route', async () => {
+    const token = 'independent-mytada-test-api-secret-123456';
+    const mytadaEnv = { ...env, domain: ['mytada.ai'], managed_mailbox_domain: 'mytada.ai', managed_api_token: token };
+    const request = (path, params) => mytadaWorker.fetch(new Request(`https://mail.mytada.ai/api/public/${path}`, {
+      method: 'POST', headers: { Authorization: token, 'Content-Type': 'application/json' }, body: JSON.stringify(params),
+    }), mytadaEnv, {});
+    const first = (await (await request('ensureMailbox', { externalKey: EXTERNAL_KEY })).json()).data;
+    const second = (await (await request('ensureMailbox', { externalKey: 'tada:dev:650e8400-e29b-41d4-a716-446655440000' })).json()).data;
+    const own = await seedMail(first.address);
+    const other = await seedMail(second.address);
+    for (const params of [{}, null, { ownerEmail: '' }, { ownerEmail: ' ' }, { ownerEmail: 1 }, { toEmail: first.address }]) {
+      const denied = await request('emailList', params);
+      expect(denied.status).toBe(400);
+      expect((await denied.json()).data).toBeUndefined();
+    }
+    const rows = (await (await request('emailList', { ownerEmail: first.address })).json()).data;
+    expect(rows.map(row => row.emailId)).toEqual([own.emailId]);
+    const filtered = await request('emailList', { ownerEmail: first.address, emailId: other.emailId });
+    expect((await filtered.json()).data).toEqual([]);
+    const addressed = await request('emailList', { ownerEmail: first.address, toEmail: second.address });
+    expect((await addressed.json()).data).toEqual([]);
+  });
+
 });

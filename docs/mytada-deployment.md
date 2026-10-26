@@ -55,13 +55,13 @@ node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada.toml
 
 ## 托管 API 与监控
 
-基础地址 `https://mail.mytada.ai/api`。四个 POST：`/public/ensureMailbox`、`/public/emailList`、`/public/sendEmail`、`/public/attachment`。Header 为 `Authorization: <managed_api_token>`，**不带 Bearer 前缀**。稳定 externalKey 格式仍是 `tada:<scope>:<UUID>`；新地址为 `u` + 八位数字 + `@mytada.ai`。列表传 `ownerEmail` 做邮箱范围限制；附件传 `ownerEmail`、`emailId`、`attId`。
+基础地址 `https://mail.mytada.ai/api`。四个 POST：`/public/ensureMailbox`、`/public/emailList`、`/public/sendEmail`、`/public/attachment`。Header 为 `Authorization: <managed_api_token>`，**不带 Bearer 前缀**。稳定 externalKey 格式仍是 `tada:<scope>:<UUID>`；新地址为 `u` + 八位数字 + `@mytada.ai`。列表必须传非空 `ownerEmail` 做邮箱范围限制，缺省返回 HTTP 400，不支持全库查询；附件传 `ownerEmail`、`emailId`、`attId`。
 
 `GET /health/live` 公开返回 `{ok:true}`，不查询依赖。`GET /health/ready` 必须用 `Authorization: <monitor_token>`（无 Bearer）；200/503 返回 `{ok,checks:{d1,kv,r2}}`，缺少鉴权401。检查最新 account schema、注册关闭、固定 KV/R2 标记，单次最长约3秒，不返回用户数据、错误详情或secret。建议每5分钟检查，避免高频探测。KV 标记传播存在最终一致性，初次导入后稍候重试。
 
 ## Resend 配置及明确限制
 
-初始发信关闭。为 **mytada.ai** 创建/验证独立 Resend domain，按该域名给出的记录设置 DKIM/SPF，按需设置 DMARC；不要修改 Cloudflare Email Routing 根域入站 MX。创建仅可发送该域名的新 Resend API key，不复用旧部署 token。
+初始发信关闭。使用独立的 Resend 账号，从免费方案起步（具体配额与可用性以该账号当前控制台为准）；不要复用内部部署的 Resend 账号或密钥。为 **mytada.ai** 创建/验证独立 Resend domain，按该域名给出的记录设置 DKIM/SPF，按需设置 DMARC；不要修改 Cloudflare Email Routing 根域入站 MX。创建仅可发送该域名的新 Resend API key，不复用旧部署 token。
 
 用新管理员登录 `https://mail.mytada.ai`，在系统设置的 Resend token 映射中添加 `mytada.ai` 对应的独立 key，然后启用发送（`send=0`）；该操作会同时刷新 KV 设置缓存。直接改 D1 设置不会刷新 KV，不能仅改 D1。使用 API 保存设置时同样通过管理员登录会话调用 `/api/setting/set`，不要把 token 放在 URL。密钥存储在本部署 D1/KV 设置内，不是 Worker `managed_api_token`。
 
