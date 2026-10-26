@@ -61,7 +61,11 @@ node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada.toml
 
 ## Resend 配置及明确限制
 
-初始发信关闭。使用独立的 Resend 账号，从免费方案起步（具体配额与可用性以该账号当前控制台为准）；不要复用内部部署的 Resend 账号或密钥。为 **mytada.ai** 创建/验证独立 Resend domain，按该域名给出的记录设置 DKIM/SPF，按需设置 DMARC；不要修改 Cloudflare Email Routing 根域入站 MX。创建仅可发送该域名的新 Resend API key，不复用旧部署 token。
+初始发信关闭。按用户最新安排，使用现有 **sylhelios** Resend 账号，为 **mytada.ai** 新增独立域名并创建仅允许该域名发送的新 API key；账户共享，域名和凭据保持独立，不复用其他域名的 token。账户发送额度由各域名共享，从免费方案起步，后续按需付费（具体额度与可用性以该账号当前控制台为准）。
+
+先检查现有 `gennovel.app` 最近三个月的使用情况；检查期间保留旧域名、密钥和 DNS，不停用旧域名。若控制台或 API 记录保留期不足三个月，应明确记录可核查范围，不能据此断言没有使用。
+
+为 **mytada.ai** 完成域名验证，按该域名给出的记录设置 DKIM/SPF，按需设置 DMARC；不要修改 Cloudflare Email Routing 根域入站 MX。
 
 用新管理员登录 `https://mail.mytada.ai`，在系统设置的 Resend token 映射中添加 `mytada.ai` 对应的独立 key，然后启用发送（`send=0`）；该操作会同时刷新 KV 设置缓存。直接改 D1 设置不会刷新 KV，不能仅改 D1。使用 API 保存设置时同样通过管理员登录会话调用 `/api/setting/set`，不要把 token 放在 URL。密钥存储在本部署 D1/KV 设置内，不是 Worker `managed_api_token`。
 
@@ -70,6 +74,8 @@ node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada.toml
 旧 `/api/webhooks` 无签名校验，已禁用。发送接口成功表示 Resend 已接受请求，数据库停留 SENT；不会据 webhook 自动变为 DELIVERED/BOUNCED/COMPLAINED。实际投递状态看独立 Resend 域的后台，不能把 API 接受当最终投递。启用外发后用授权测试收件人验证收发及附件，不群发。
 
 ## 验证与回滚
+
+2026-10-26 部署记录：Worker 版本 `52a215bf-2d4f-48cf-907c-233fcde9382b` 已部署，健康检查验证通过。邮件收发端到端验证尚未完成，健康检查通过不代表邮件已经可正常投递。
 
 本地验证：`node node_modules/vitest/vitest.mjs run --config vitest.unit.config.js`，然后上述 dry-run（包含 Vue build）。部署后核对 live、带鉴权 ready、匿名注册/init/oss/webhook=404、缺 API token=401、ensureMailbox 重试返回同一 mytada 地址、入站邮件及私有附件。不要用真实用户内容做探针。
 
