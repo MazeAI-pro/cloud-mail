@@ -11,6 +11,8 @@
 | R2 | `cloud-mail-mytada-attachments` |
 | 管理员 | `admin@mytada.ai` |
 
+当前 Cloudflare Workers 保持 **Free**，按用户明确要求暂不升级，尚未确认 Paid。资源独立不代表套餐额度独立，同一账户的相关套餐额度共享；正式上线前应按实际 CPU 用量与调用量评估容量和是否需要升级。
+
 ## 离线初始化（新空数据库一次性操作）
 
 不访问 `/api/init/:secret`，不通过公开注册创建管理员。这两个入口在独立 Worker 中永久禁用。以下本地脚本使用临时 Miniflare D1，从现有 migration 生成全新 schema、权限、关闭注册的 settings 和管理员密码 hash，无任何云端读写。输入密码建议使用密码管理器生成 24 字符随机密码。
@@ -75,7 +77,7 @@ node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada.toml
 
 ## 验证与回滚
 
-2026-10-26 部署记录：Worker 版本 `52a215bf-2d4f-48cf-907c-233fcde9382b` 已部署，健康检查验证通过。邮件收发端到端验证尚未完成，健康检查通过不代表邮件已经可正常投递。
+2026-10-26 部署记录：Worker 版本 `52a215bf-2d4f-48cf-907c-233fcde9382b` 已部署，健康检查验证通过。线上 `ensureMailbox` 创建及幂等重试已验证通过，列表缺少 `ownerEmail` 返回 HTTP 400。邮件收发端到端验证尚未完成，健康检查通过不代表邮件已经可正常投递。
 
 本地验证：`node node_modules/vitest/vitest.mjs run --config vitest.unit.config.js`，然后上述 dry-run（包含 Vue build）。部署后核对 live、带鉴权 ready、匿名注册/init/oss/webhook=404、缺 API token=401、ensureMailbox 重试返回同一 mytada 地址、入站邮件及私有附件。不要用真实用户内容做探针。
 
