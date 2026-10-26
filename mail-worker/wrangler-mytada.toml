@@ -1,0 +1,47 @@
+name = "cloud-mail-mytada"
+account_id = "070412c4db637c7d39470106bee7bd84"
+main = "src/mytada.js"
+compatibility_date = "2025-06-04"
+keep_vars = false
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = "mail.mytada.ai"
+custom_domain = true
+
+[observability]
+enabled = false
+
+[[d1_databases]]
+binding = "db"
+database_name = "cloud-mail-mytada"
+database_id = "1e201159-61c1-4647-a4b9-0bc0552fe62e"
+
+[[kv_namespaces]]
+binding = "kv"
+id = "dad8c724860e412e8a7e799688a0d8bc"
+
+[[r2_buckets]]
+binding = "r2"
+bucket_name = "cloud-mail-mytada-attachments"
+
+[assets]
+binding = "assets"
+directory = "./dist"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[triggers]
+crons = ["0 16 * * *"]
+
+[vars]
+orm_log = false
+domain = ["mytada.ai"]
+managed_mailbox_domain = "mytada.ai"
+admin = "admin@mytada.ai"
+project_link = false
+feishu_switch = "false"
+
+[build]
+command = "cd ../mail-vue && node node_modules/vite/bin/vite.js build --mode mytada"

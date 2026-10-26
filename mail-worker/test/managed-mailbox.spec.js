@@ -1,3 +1,4 @@
+import mytadaWorker from '../src/mytada';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalD1 } from './helpers/local-d1';
 import { dbInit } from '../src/init/init';
@@ -244,5 +245,20 @@ describe('scoped mailbox queries', () => {
     await env.db.prepare('UPDATE email SET is_del = 1 WHERE email_id = ?').bind(own.emailId).run();
     expect((await (await request('attachment', { ownerEmail: allocated.data.address, emailId: own.emailId, attId })).json()).code).not.toBe(200);
     delete env.r2;
+  });
+});
+
+describe('isolated mytada entrypoint integration', () => {
+  it('allocates a scoped mailbox using its own Worker secret without a KV public token', async () => {
+    const token = 'independent-mytada-test-api-secret-123456';
+    const mytadaEnv = { ...env, domain: ['mytada.ai'], managed_mailbox_domain: 'mytada.ai', managed_api_token: token };
+    const response = await mytadaWorker.fetch(new Request('https://mail.mytada.ai/api/public/ensureMailbox', {
+      method: 'POST', headers: { Authorization: token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ externalKey: EXTERNAL_KEY }),
+    }), mytadaEnv, {});
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.data.address).toMatch(/^u[1-9]\d{7}@mytada\.ai$/);
+    expect(await env.kv.get('public_key:')).toBe('local-public-token');
   });
 });

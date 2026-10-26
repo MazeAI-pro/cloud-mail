@@ -31,12 +31,12 @@ function positiveInteger(value, name, allowZero = false) {
   return number;
 }
 
-function randomAddress() {
+function randomAddress(domain) {
   // Reject the incomplete range so every eight-digit integer is equally likely.
   const limit = Math.floor(0x100000000 / ADDRESS_COUNT) * ADDRESS_COUNT;
   const draw = new Uint32Array(1);
   do { crypto.getRandomValues(draw); } while (draw[0] >= limit);
-  return `u${10000000 + draw[0] % ADDRESS_COUNT}@${MAILBOX_DOMAIN}`;
+  return `u${10000000 + draw[0] % ADDRESS_COUNT}@${domain}`;
 }
 
 const managedMailboxService = {
@@ -54,21 +54,22 @@ const managedMailboxService = {
       throw new BizError('displayName 必须为不超过 30 字符的单行名称', 400);
     }
     try {
+      const mailboxDomain = c.env.managed_mailbox_domain || MAILBOX_DOMAIN;
       let domains = c.env.domain;
       if (typeof domains === 'string') domains = JSON.parse(domains);
-      if (!Array.isArray(domains) || !domains.includes(MAILBOX_DOMAIN)) {
-        throw new BizError('未配置受管邮箱域名 mazeai.pro', 503);
+      if (!Array.isArray(domains) || !domains.includes(mailboxDomain)) {
+        throw new BizError(`未配置受管邮箱域名 ${mailboxDomain}`, 503);
       }
       const existing = await this.findByExternalKey(c, externalKey);
       if (existing) return { address: usableAccount(existing).address, created: false };
       const defaultRole = await roleService.selectDefaultRole(c);
-      if (!defaultRole || !roleService.hasAvailDomainPerm(defaultRole.availDomain || '', `u10000000@${MAILBOX_DOMAIN}`)) {
+      if (!defaultRole || !roleService.hasAvailDomainPerm(defaultRole.availDomain || '', `u10000000@${mailboxDomain}`)) {
         throw new BizError('默认邮箱角色未配置或无域名权限', 503);
       }
       const passwordBytes = crypto.getRandomValues(new Uint8Array(32));
       const { salt, hash } = await cryptoUtils.hashPassword(btoa(String.fromCharCode(...passwordBytes)));
       for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt++) {
-        const address = randomAddress();
+        const address = randomAddress(mailboxDomain);
         try {
           // D1 batches are transactional; an account conflict also rolls back its user.
           await c.env.db.batch([
