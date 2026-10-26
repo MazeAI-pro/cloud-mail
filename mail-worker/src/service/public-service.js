@@ -19,6 +19,7 @@ import emailService from './email-service';
 import KvConst from '../const/kv-const';
 import { Resend } from 'resend';
 import managedMailboxService from './managed-mailbox-service';
+import { managedMailFilter } from '../utils/managed-mail-filter';
 
 const publicService = {
 
@@ -82,23 +83,23 @@ const publicService = {
     }
 
 		if (toEmail) {
-			conditions.push(sql`${email.toEmail} COLLATE NOCASE LIKE ${toEmail}`)
+			conditions.push(scope ? managedMailFilter(email.toEmail, toEmail, 'toEmail') : sql`${email.toEmail} COLLATE NOCASE LIKE ${toEmail}`)
 		}
 
 		if (sendEmail) {
-			conditions.push(sql`${email.sendEmail} COLLATE NOCASE LIKE ${sendEmail}`)
+			conditions.push(scope ? managedMailFilter(email.sendEmail, sendEmail, 'sendEmail') : sql`${email.sendEmail} COLLATE NOCASE LIKE ${sendEmail}`)
 		}
 
 		if (sendName) {
-			conditions.push(sql`${email.name} COLLATE NOCASE LIKE ${sendName}`)
+			conditions.push(scope ? managedMailFilter(email.name, sendName, 'sendName') : sql`${email.name} COLLATE NOCASE LIKE ${sendName}`)
 		}
 
 		if (subject) {
-			conditions.push(sql`${email.subject} COLLATE NOCASE LIKE ${subject}`)
+			conditions.push(scope ? managedMailFilter(email.subject, subject, 'subject') : sql`${email.subject} COLLATE NOCASE LIKE ${subject}`)
 		}
 
 		if (content) {
-			conditions.push(sql`${email.content} COLLATE NOCASE LIKE ${content}`)
+			conditions.push(scope ? managedMailFilter(email.content, content, 'content') : sql`${email.content} COLLATE NOCASE LIKE ${content}`)
 		}
 
 		if (type || type === 0) {

@@ -193,6 +193,46 @@ describe('scoped mailbox queries', () => {
     expect(await publicService.emailList(c, { toEmail: address })).toHaveLength(1);
   });
 
+  it.each([
+    ['toEmail', 'to_email'], ['sendEmail', 'send_email'], ['sendName', 'name'],
+    ['subject', 'subject'], ['content', 'content'],
+  ])('matches long %s filters with real SQLite while preserving owner, direction and deletion scope', async (field, column) => {
+    const { address } = await ensure();
+    const own = await seedMail(address);
+    const other = await ensure('tada:dev:650e8400-e29b-41d4-a716-446655440000');
+    await seedMail(other.address);
+    const deleted = await seedMail(address);
+    const outbound = await seedMail(address);
+    const value = "AbC'" + '中'.repeat(18) + 'É';
+    await env.db.prepare(`UPDATE email SET ${column} = ?`).bind(value).run();
+    await env.db.prepare('UPDATE email SET is_del = 1 WHERE email_id = ?').bind(deleted.emailId).run();
+    await env.db.prepare('UPDATE email SET type = 1 WHERE email_id = ?').bind(outbound.emailId).run();
+    const filters = [value, value.replace('AbC', 'aBc'), `%${value}%`, `${value.slice(0, -1)}%`, `%${value.slice(1)}`];
+    for (const pattern of filters) {
+      const rows = await publicService.emailList(c, { ownerEmail: address, direction: 'inbound', [field]: pattern, size: 1 });
+      expect(rows.map(row => row.emailId)).toEqual([own.emailId]);
+      expect(await publicService.emailList(c, { ownerEmail: address, direction: 'inbound', [field]: pattern, size: 1, num: 2 })).toEqual([]);
+    }
+    for (const pattern of [value.replace('É', 'é'), `${value}missing`, `%missing${value}%`, `${value.slice(1)}%`, `%${value.slice(0, -1)}`]) {
+      expect(await publicService.emailList(c, { ownerEmail: address, direction: 'inbound', [field]: pattern })).toEqual([]);
+    }
+  });
+
+  it('preserves short wildcard semantics at the UTF-8 boundary and rejects long complex patterns', async () => {
+    const { address } = await ensure();
+    const own = await seedMail(address);
+    const value = '中'.repeat(16) + 'AZ';
+    await env.db.prepare('UPDATE email SET subject = ?').bind(value).run();
+    const shortPatterns = ['中'.repeat(16) + '_%', '中'.repeat(15) + '%A_'];
+    expect(new TextEncoder().encode(shortPatterns[0]).length).toBe(50);
+    for (const subject of [...shortPatterns, `%${value}%`]) {
+      expect((await publicService.emailList(c, { ownerEmail: address, subject })).map(row => row.emailId)).toEqual([own.emailId]);
+    }
+    for (const subject of ['中'.repeat(16) + '__%', 'a'.repeat(50) + '_', 'a'.repeat(30) + '%' + 'b'.repeat(30), '%' + 'a'.repeat(50) + '%%', 'a'.repeat(51) + '\0']) {
+      await expect(publicService.emailList(c, { ownerEmail: address, subject })).rejects.toMatchObject({ code: 400 });
+    }
+  });
+
   it.each([99, 100])('returns %i scoped rows with empty and owned attachment metadata within D1 limits', async size => {
     const { address } = await ensure();
     const owner = await env.db.prepare('SELECT account_id, user_id FROM account WHERE email = ?').bind(address).first();
@@ -260,6 +300,24 @@ describe('isolated mytada entrypoint integration', () => {
     const payload = await response.json();
     expect(payload.data.address).toMatch(/^u[1-9]\d{7}@mytada\.ai$/);
     expect(await env.kv.get('public_key:')).toBe('local-public-token');
+  });
+
+  it('returns HTTP 400 for long unsupported wildcard patterns and 200 for long literal matches', async () => {
+    const token = 'independent-mytada-test-api-secret-123456';
+    const mytadaEnv = { ...env, domain: ['mytada.ai'], managed_mailbox_domain: 'mytada.ai', managed_api_token: token };
+    const request = (method, params) => mytadaWorker.fetch(new Request(`https://mail.mytada.ai/api/public/${method}`, {
+      method: 'POST', headers: { Authorization: token, 'Content-Type': 'application/json' }, body: JSON.stringify(params),
+    }), mytadaEnv, {});
+    const { address } = (await (await request('ensureMailbox', { externalKey: EXTERNAL_KEY })).json()).data;
+    const own = await seedMail(address);
+    const subject = 'mytada-preview-switch-' + 'a'.repeat(40);
+    await env.db.prepare('UPDATE email SET subject = ?').bind(subject).run();
+    const response = await request('emailList', { ownerEmail: address, subject: `%${subject}%` });
+    expect(response.status).toBe(200);
+    expect((await response.json()).data.map(row => row.emailId)).toEqual([own.emailId]);
+    const denied = await request('emailList', { ownerEmail: address, subject: subject + '_' });
+    expect(denied.status).toBe(400);
+    expect((await denied.json()).code).toBe(400);
   });
 
   it('requires an owner and never returns another mailbox through the isolated list route', async () => {
