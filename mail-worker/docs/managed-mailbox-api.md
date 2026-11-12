@@ -48,17 +48,9 @@ The email and attachment must belong to the exact account/user; deleted emails a
 
 From `mail-worker`, run `node node_modules/vitest/vitest.mjs run --config vitest.unit.config.js` (or `pnpm test:unit`). Tests use Wrangler's already-installed Miniflare D1 runtime and do not access deployed services. The Cloudflare worker-pool starter test remains in the separate `vitest.config.js` suite.
 
-## Sender profile (local implementation, not deployed)
-
-`POST /api/public/mailboxProfile` accepts exactly `{ownerEmail, externalKey}`.
-`POST /api/public/updateMailboxProfile` accepts exactly `{ownerEmail, externalKey, displayName}`.
-Both are included in the isolated mytada service-token route allowlist and use the same Authorization header as existing managed endpoints. The address and `tada:<scope>:<UUID>` key must identify the same active account and user; mismatches fail closed. Missing mailboxes return 404 without creating anything. Unknown fields are rejected.
-
-Success returns `{code:200,message:"success",data:{address,displayName}}`. Updates trim whitespace, require 1–40 Unicode codepoints, and reject control/surrogate characters and line separators. The only persisted change is `account.name`; the response comes from the updated row. Account IDs, email, external key, user nickname, creation defaults and historical messages do not change. Public and signed-in send paths safely quote display-name phrases (including Chinese and quotes) for Resend; unsafe pre-existing names fail before external sending. Changes apply to future sends only.
-
 ## Address rename replacement (local implementation; no migration/deployment yet)
 
-The sender-name editor described above is superseded: `updateMailboxProfile` is removed. `POST /api/public/mailboxProfile` accepts exactly `{externalKey}` and performs a noncreating lookup. It returns `{provisioned,address,pendingOperation,canEditAddress}`. Pending operations contain `{operationId,expectedAddress,address}`. `canEditAddress` requires both the explicit migration and `MAILBOX_ADDRESS_EDIT_ENABLED=true`; default is disabled.
+The previous sender-name editor is removed: `updateMailboxProfile` is removed. `POST /api/public/mailboxProfile` accepts exactly `{externalKey}` and performs a noncreating lookup. It returns `{provisioned,address,pendingOperation,canEditAddress}`. Pending operations contain `{operationId,expectedAddress,address}`. `canEditAddress` requires both the explicit migration and `MAILBOX_ADDRESS_EDIT_ENABLED=true`; default is disabled.
 
 `POST /api/public/renameMailbox` accepts exactly `{externalKey,expectedAddress,newLocalPart,operationId}`. The operation ID is a caller-generated UUID retained across retries. The prefix is trimmed/lowercased and must contain 3–32 ASCII letters/digits/dot/underscore/hyphen, begin and end with alphanumeric, and contain no consecutive dots. Administrative names and the generated `u` plus 8-digit namespace are reserved. Only `mytada.ai` supports this operation. The service token and exact active external-key/current-address pair are required. Reusing an operation ID for different arguments conflicts. An unfinished operation blocks a second rename.
 
