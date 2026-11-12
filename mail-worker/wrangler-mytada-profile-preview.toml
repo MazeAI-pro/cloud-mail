@@ -6,6 +6,10 @@ keep_vars = false
 workers_dev = true
 preview_urls = false
 
+[[routes]]
+pattern = "mail-profile-preview.mytada.ai"
+custom_domain = true
+
 [observability]
 enabled = false
 
