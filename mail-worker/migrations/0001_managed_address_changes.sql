@@ -31,6 +31,10 @@ BEGIN SELECT RAISE(ABORT, 'retired_address');
 END;
 CREATE TRIGGER IF NOT EXISTS managed_address_change_validate BEFORE INSERT ON managed_address_change
 BEGIN
+  SELECT CASE WHEN NEW.expected_address = NEW.new_address COLLATE NOCASE THEN RAISE(ABORT, 'address_unchanged') END;
+  SELECT CASE WHEN EXISTS (SELECT 1 FROM account WHERE email = NEW.new_address COLLATE NOCASE)
+    OR EXISTS (SELECT 1 FROM user WHERE email = NEW.new_address COLLATE NOCASE)
+    THEN RAISE(ABORT, 'address_unavailable') END;
   SELECT CASE WHEN NOT EXISTS (
     SELECT 1 FROM account a JOIN user u ON a.user_id = u.user_id
     WHERE a.external_key = NEW.external_key AND a.email = NEW.expected_address COLLATE NOCASE

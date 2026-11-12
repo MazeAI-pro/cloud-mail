@@ -49,7 +49,7 @@ const mailboxAddressService = {
     validateParams(params, ['externalKey', 'expectedAddress', 'newLocalPart', 'operationId']);
     if (c.env.MAILBOX_ADDRESS_EDIT_ENABLED !== 'true') throw new BizError('邮箱地址修改尚未开放', 403);
     if (!(await addressSchemaReady(c))) throw new BizError('邮箱地址迁移尚未完成', 503);
-    if (!UUID_PATTERN.test(params.operationId || '') || typeof params.expectedAddress !== 'string') throw new BizError('邮箱参数无效', 400);
+    if (!UUID_PATTERN.test(params.operationId || '') || typeof params.expectedAddress !== 'string' || !/^[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]@mytada\.ai$/.test(params.expectedAddress) || params.expectedAddress.includes('..')) throw new BizError('邮箱参数无效', 400);
     const name = normalizeLocalPart(params.newLocalPart);
     const domain = c.env.managed_mailbox_domain || 'mazeai.pro';
     if (domain !== 'mytada.ai') throw new BizError('仅支持 mytada.ai 邮箱', 400);
@@ -68,7 +68,7 @@ const mailboxAddressService = {
     } catch (error) {
       const retry = await operation(c, params.operationId);
       if (retry) return matching(retry);
-      if (/UNIQUE|retired_address|address_changed_or_unavailable/.test(error.message)) throw new BizError('邮箱地址已被占用或修改尚未完成，请刷新后重试', 409);
+      if (/UNIQUE|retired_address|address_changed_or_unavailable|address_unavailable|address_unchanged/.test(error.message)) throw new BizError('邮箱地址已被占用或修改尚未完成，请刷新后重试', 409);
       throw error;
     }
     return matching(await operation(c, params.operationId));

@@ -58,3 +58,9 @@ it('rolls back collisions without losing old identity and preserves custom sende
 it.each(['ab', 'admin', 'x..y', '.abc', 'abc-', 'a'.repeat(33), '中文', 'u12345678', 'x\r\ny'])('rejects invalid or reserved prefix %j', value => {
   expect(() => normalizeLocalPart(value)).toThrow();
 });
+
+it('rejects differently cased no-op rename at API and SQL boundary', async () => {
+  await expect(addressService.rename(c, { externalKey: KEY, expectedAddress: 'HELIOS@mytada.ai', newLocalPart: 'helios', operationId: OP.replace(/1$/, '7') })).rejects.toMatchObject({ code: 400 });
+  await expect(c.env.db.prepare('INSERT INTO managed_address_change(operation_id, external_key, expected_address, new_address) VALUES(?,?,?,?)').bind(OP.replace(/1$/, '7'), KEY, 'HELIOS@mytada.ai', 'helios@mytada.ai').run()).rejects.toThrow('address_unchanged');
+  expect(await isRetiredAddress(c, 'helios@mytada.ai')).toBe(false);
+});
