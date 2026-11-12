@@ -58,6 +58,23 @@ const mailboxAddressService = {
     return { provisioned: true, address: row.address, pendingOperation, renameUsed, canEditAddress: lifetimeReady && !renameUsed && c.env.MAILBOX_ADDRESS_EDIT_ENABLED === 'true' };
   },
 
+  async check(c, params) {
+    validateParams(params, ['externalKey', 'newLocalPart']);
+    if (c.env.MAILBOX_ADDRESS_EDIT_ENABLED !== 'true') throw new BizError('邮箱地址修改尚未开放', 403);
+    if (!(await lifetimeSchemaReady(c))) throw new BizError('邮箱地址迁移尚未完成', 503);
+    const name = normalizeLocalPart(params.newLocalPart);
+    if (c.env.managed_mailbox_domain !== 'mytada.ai') throw new BizError('仅支持 mytada.ai 邮箱', 400);
+    const profile = await this.profile(c, { externalKey: params.externalKey });
+    if (!profile.provisioned) throw new BizError('邮箱尚未创建', 409);
+    const address = `${name}@mytada.ai`;
+    // Advisory only: the rename transaction checks availability again atomically.
+    const occupied = await c.env.db.prepare(`SELECT 1 AS occupied FROM account WHERE email = ? COLLATE NOCASE
+      UNION ALL SELECT 1 FROM user WHERE email = ? COLLATE NOCASE
+      UNION ALL SELECT 1 FROM managed_retired_address WHERE address = ? COLLATE NOCASE LIMIT 1`)
+      .bind(address, address, address).first();
+    return { available: !occupied, address, renameUsed: profile.renameUsed, canEditAddress: profile.canEditAddress };
+  },
+
   async rename(c, params) {
     validateParams(params, ['externalKey', 'expectedAddress', 'newLocalPart', 'operationId']);
     if (c.env.MAILBOX_ADDRESS_EDIT_ENABLED !== 'true') throw new BizError('邮箱地址修改尚未开放', 403);

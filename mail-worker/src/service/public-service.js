@@ -29,6 +29,10 @@ const publicService = {
     return mailboxAddressService.profile(c, params);
   },
 
+  async checkMailboxAddress(c, params) {
+    return mailboxAddressService.check(c, params);
+  },
+
   async renameMailbox(c, params) {
     return mailboxAddressService.rename(c, params);
   },

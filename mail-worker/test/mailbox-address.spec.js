@@ -5,6 +5,7 @@ import { dbInit } from '../src/init/init';
 import managed from '../src/service/managed-mailbox-service';
 import addressService, { isRetiredAddress, normalizeLocalPart } from '../src/service/mailbox-address-service';
 import { email } from '../src/email/email';
+import worker from '../src/mytada';
 const KEY = 'tada:dev:550e8400-e29b-41d4-a716-446655440000';
 const OP = '00000000-0000-4000-8000-000000000001';
 let runtime, c;
@@ -116,8 +117,38 @@ it('allows one operation when distinct requests race for the same target', async
   expect(await addressService.profile(c, { externalKey: key })).toMatchObject({ renameUsed: true, canEditAddress: false });
 });
 
+it('checks availability read-only, separately from lifetime eligibility', async () => {
+  const key = KEY.replace(/0$/, '7');
+  const queries = [];
+  const readonly = { ...c, env: { ...c.env, db: { prepare: sql => {
+    queries.push(sql);
+    expect(sql.trim()).toMatch(/^(SELECT|PRAGMA) /);
+    return c.env.db.prepare(sql);
+  } } } };
+  expect(await addressService.check(readonly, { externalKey: key, newLocalPart: ' Available-Name ' })).toEqual({ address: 'available-name@mytada.ai', available: true, renameUsed: false, canEditAddress: true });
+  expect(await addressService.check(readonly, { externalKey: key, newLocalPart: 'helios' })).toMatchObject({ available: false, canEditAddress: true });
+  expect(await addressService.check(readonly, { externalKey: key, newLocalPart: 'legacy-first' })).toMatchObject({ available: false });
+  expect(await addressService.check(readonly, { externalKey: KEY, newLocalPart: 'available-name' })).toMatchObject({ available: true, renameUsed: true, canEditAddress: false });
+  await expect(addressService.check(readonly, { externalKey: KEY.replace(/00$/, '88'), newLocalPart: 'available-name' })).rejects.toMatchObject({ code: 409 });
+  await expect(addressService.check(readonly, { externalKey: key, newLocalPart: 'admin' })).rejects.toMatchObject({ code: 400 });
+  await expect(addressService.check(readonly, { externalKey: key, newLocalPart: 'available-name', userId: 'other' })).rejects.toMatchObject({ code: 400 });
+  expect(queries.length).toBeGreaterThan(0);
+});
+
+it('authenticates the availability route and rejects disabled preparation', async () => {
+  const secret = 'test-service-secret-at-least-32-characters';
+  const request = token => new Request('https://mail.mytada.ai/api/public/checkMailboxAddress', { method: 'POST', headers: { Authorization: token }, body: JSON.stringify({ externalKey: KEY.replace(/0$/, '7'), newLocalPart: 'available-name' }) });
+  const env = { ...c.env, managed_api_token: secret };
+  expect((await worker.fetch(request('wrong'), env, {})).status).toBe(401);
+  const response = await worker.fetch(request(secret), env, {});
+  expect(response.status).toBe(200);
+  expect((await response.json()).data).toMatchObject({ available: true, canEditAddress: true });
+  expect((await worker.fetch(request(secret), { ...env, MAILBOX_ADDRESS_EDIT_ENABLED: 'false' }, {})).status).toBe(403);
+});
+
 it('fails closed if the lifetime enforcement trigger is missing', async () => {
   await c.env.db.prepare('DROP TRIGGER managed_address_lifetime_claim').run();
+  await expect(addressService.check(c, { externalKey: KEY, newLocalPart: 'available-name' })).rejects.toMatchObject({ code: 503 });
   expect(await addressService.profile(c, { externalKey: KEY })).toMatchObject({ renameUsed: true, canEditAddress: false });
   await expect(addressService.rename(c, { externalKey: KEY, expectedAddress: 'helios@mytada.ai', newLocalPart: 'blocked', operationId: OP })).rejects.toMatchObject({ code: 503 });
 });

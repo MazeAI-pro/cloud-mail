@@ -7,6 +7,7 @@ const managedApp = new Hono();
 const PUBLIC_METHODS = {
   ensureMailbox: 'ensureMailbox',
   mailboxProfile: 'mailboxProfile',
+  checkMailboxAddress: 'checkMailboxAddress',
   renameMailbox: 'renameMailbox',
   finalizeMailboxRename: 'finalizeMailboxRename',
   emailList: 'emailList',
