@@ -7,7 +7,8 @@ const LOCAL_PATTERN = /^[a-z0-9_-]+(?:\.[a-z0-9_-]+)*$/;
 export function normalizeLocalPart(value) {
   if (typeof value !== 'string') throw new BizError('邮箱前缀格式无效', 400);
   const name = value.trim().toLowerCase();
-  if (name.length > 64 || !LOCAL_PATTERN.test(name)) throw new BizError('邮箱前缀格式无效', 400);
+  if (name.length < 3 || name.length > 36) throw new BizError('邮箱前缀需为 3–36 位', 400);
+  if (!LOCAL_PATTERN.test(name)) throw new BizError('邮箱前缀格式无效', 400);
   return name;
 }
 

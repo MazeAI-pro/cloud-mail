@@ -54,6 +54,29 @@ it('requires the owner identity and old address', async () => {
   await expect(addressService.profile(c, { externalKey: KEY, ownerEmail: 'someone@mytada.ai' })).rejects.toMatchObject({ code: 400 });
 });
 it('accepts supported syntax without business reservations', () => {
-  for (const name of ['a', 'admin', 'u12345678', 'a'.repeat(64), '_a-']) expect(normalizeLocalPart(name)).toBe(name);
-  for (const name of ['', '.a', 'a.', 'a..b', 'a'.repeat(65), 'a+b', '中文']) expect(() => normalizeLocalPart(name)).toThrow();
+  for (const name of ['abc', 'admin', 'u12345678', 'a'.repeat(36), '_a-']) expect(normalizeLocalPart(name)).toBe(name);
+  for (const name of ['', 'a', 'ni', '.a', 'a.', 'a..b', 'a'.repeat(37), 'a+b', '中文']) expect(() => normalizeLocalPart(name)).toThrow();
+});
+
+it('rejects invalid lengths for new checks and renames', async () => {
+  for (const newLocalPart of ['ni', 'a'.repeat(37)]) {
+    const params = { externalKey: KEY, newLocalPart };
+    await expect(addressService.check(c, params)).rejects.toMatchObject({ code: 400, message: '邮箱前缀需为 3–36 位' });
+    await expect(addressService.rename(c, { ...params, expectedAddress: 'helios@mytada.ai' })).rejects.toMatchObject({ code: 400, message: '邮箱前缀需为 3–36 位' });
+    expect((await addressService.profile(c, { externalKey: KEY })).address).toBe('helios@mytada.ai');
+  }
+});
+it('keeps existing short addresses readable and resolvable for mail operations', async () => {
+  const key = KEY.replace(/00$/, '03');
+  const box = await managed.ensureMailbox(c, { externalKey: key });
+  const before = await managed.findByExternalKey(c, key);
+  // Seed a legacy address without passing through the new-address validation.
+  await c.env.db.batch([
+    c.env.db.prepare('UPDATE account SET email = ? WHERE email = ?').bind('ni@mytada.ai', box.address),
+    c.env.db.prepare('UPDATE user SET email = ? WHERE email = ?').bind('ni@mytada.ai', box.address),
+  ]);
+  expect(await addressService.profile(c, { externalKey: key })).toEqual({ provisioned: true, address: 'ni@mytada.ai' });
+  const owner = await managed.resolveOwner(c, 'ni@mytada.ai');
+  expect(owner.accountId).toBe(before.accountId);
+  expect(owner.userId).toBe(before.userId);
 });

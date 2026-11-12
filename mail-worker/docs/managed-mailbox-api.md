@@ -50,7 +50,7 @@ From `mail-worker`, run `node node_modules/vitest/vitest.mjs run --config vitest
 
 ## Address rename replacement (local implementation; no migration/deployment yet)
 
-`POST /api/public/mailboxProfile` accepts `{externalKey}` and reads the existing active mailbox without creating it. `checkMailboxAddress` accepts `{externalKey,newLocalPart}` and returns `{available,address}` without writes. Prefixes are normalized to lowercase and support letters, digits, dots, underscores and hyphens, up to the email local-part limit of 64 characters; dots cannot be first, last or consecutive. No business names are reserved.
+`POST /api/public/mailboxProfile` accepts `{externalKey}` and reads the existing active mailbox without creating it. `checkMailboxAddress` accepts `{externalKey,newLocalPart}` and returns `{available,address}` without writes. Prefixes are normalized to lowercase and support letters, digits, dots, underscores and hyphens, 3–36 characters; dots cannot be first, last or consecutive. No business names are reserved. This length requirement applies to new address requests, including retries; existing addresses retain their previous validation for profile reads and mail operations.
 
 `renameMailbox` accepts `{externalKey,expectedAddress,newLocalPart}`. A D1 batch updates the existing user and account email rows with an old-address CAS, preserving IDs, custom sender names and historical messages. The generated sender name follows the prefix. Occupancy failures roll back both rows. A stale old address conflicts; the current same-owner target is returned for retries. The old address becomes unbound, without aliases or permanent reservations. No additional Cloud tables or migrations are needed.
 
