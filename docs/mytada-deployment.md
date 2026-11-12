@@ -104,11 +104,11 @@ mytada.ai 的域名验证已完成。后续维护只调整该域所需 DKIM/SPF/
 
 ## 邮箱地址功能预览（2026-11-12）
 
-**此预览经用户明确授权，共享线上 mytada D1、KV、R2。目标功能是修改邮箱地址的 `localPart`，旧地址停用，仅新地址保留；这会影响线上邮箱身份，当前编辑尚未开放。独立 Worker 不代表数据隔离。** 不要用真实用户数据进行自动写入测试，也不要调整共享设置或发送邮件来检查部署。
+**此预览经用户明确授权，共享线上 mytada D1、KV、R2。目标功能是修改邮箱地址的 `localPart`，旧地址停用，仅新地址保留；用户确认修改后会影响线上邮箱身份。独立 Worker 不代表数据隔离。** 不要用真实用户数据进行自动写入测试，也不要调整共享设置或发送邮件来检查部署。
 
 - 配置：`mail-worker/wrangler-mytada-profile-preview.toml`；Worker：`cloud-mail-mytada-profile-preview`。
 - 地址：<https://mail-profile-preview.mytada.ai>。原 workers.dev 地址保留，但 ACK 到该地址连接超时，Tada 预览应使用此独立 custom hostname。
-- 应用代码：`4a73301de240caa44cb19cc070838f5901193443`；Worker 部署版本：`f9df7453-75a0-4e14-9e05-eaad84737827`。
+- 应用代码：`b821b384b635f66c213b980b73b86d259ff4af39`；Worker 部署版本：`b9063ee1-3673-4bab-83c5-94ad589623a6`。
 - 预览仅绑定 `mail-profile-preview.mytada.ai`，没有 cron 或 Email Routing；生产 `mail.mytada.ai` route 和 `cloud-mail-mytada` Worker 未更新。共享 KV 中的线上发信设置保持原样。
 - `jwt_secret`、`managed_api_token`、`monitor_token` 为预览独立生成，通过 Wrangler secret bulk 导入；密钥值不写入 Git。Tada 预览使用同一个预览 `managed_api_token`，Authorization 不带 Bearer。
 
