@@ -101,3 +101,24 @@ mytada.ai 的域名验证已完成。后续维护只调整该域所需 DKIM/SPF/
 本地验证：`node node_modules/vitest/vitest.mjs run --config vitest.unit.config.js`，然后上述 dry-run（包含 Vue build）。部署后核对 live、带鉴权 ready、匿名注册/init/oss/webhook=404、缺 API token=401、ensureMailbox 重试返回同一 mytada 地址、入站邮件及私有附件。不要用真实用户内容做探针。
 
 回滚仅操作 `cloud-mail-mytada` 的 Worker 版本或停止 mytada.ai 的邮件路由，不删除 D1/KV/R2 数据，不对原部署执行默认 wrangler 命令。新部署没有使用 `/init` 进行升级的后门。
+
+## 邮箱名称功能预览（2026-11-12）
+
+**此预览经用户明确授权，共享线上 mytada D1、KV、R2。保存邮箱显示名会修改线上邮箱名称。独立 Worker 不代表数据隔离。** 不要用真实用户数据进行自动写入测试，也不要调整共享设置或发送邮件来检查部署。
+
+- 配置：`mail-worker/wrangler-mytada-profile-preview.toml`；Worker：`cloud-mail-mytada-profile-preview`。
+- 地址：<https://cloud-mail-mytada-profile-preview.mazeai-pro.workers.dev>。
+- 应用代码：`fb8ca0665577d187533538be057d748304608d51`；部署及独立 secrets 上传后的版本：`4be2f914-3b5a-4d83-ad74-555720c24e4e`。
+- 预览没有 custom-domain routes、cron 或 Email Routing；生产 `cloud-mail-mytada` Worker 未更新。共享 KV 中的线上发信设置保持原样。
+- `jwt_secret`、`managed_api_token`、`monitor_token` 为预览独立生成，通过 Wrangler secret bulk 导入；密钥值不写入 Git。Tada 预览使用同一个预览 `managed_api_token`，Authorization 不带 Bearer。
+
+复现构建与部署时，从 `mail-worker` 运行以下命令，并确认独立预览 Worker 名称及共享资源范围；严禁省略 `--config`。本机复用 arm64 依赖时使用 Cursor 的 arm64 Node。
+
+```sh
+node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada-profile-preview.toml --dry-run
+node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada-profile-preview.toml
+# The private JSON file contains only the three independent preview secrets.
+node node_modules/wrangler/bin/wrangler.js secret bulk /path/to/private-preview-secrets.json --config wrangler-mytada-profile-preview.toml
+```
+
+已验证 live=200、匿名 ready=401、授权 ready=200（D1/KV/R2 全部正常）、注册入口=404。实际托管接口为 `/api/public/mailboxProfile` 和 `/api/public/updateMailboxProfile`；授权空 payload 返回 400，确认参数校验生效。未执行真实邮箱保存或收发邮件测试，不能据此声称端到端写入或邮件投递已验收。回滚此预览只操作独立预览 Worker 版本，不回滚、删除或重建共享资源。
