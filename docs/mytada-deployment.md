@@ -108,7 +108,7 @@ mytada.ai 的域名验证已完成。后续维护只调整该域所需 DKIM/SPF/
 
 - 配置：`mail-worker/wrangler-mytada-profile-preview.toml`；Worker：`cloud-mail-mytada-profile-preview`。
 - 地址：<https://mail-profile-preview.mytada.ai>。原 workers.dev 地址保留，但 ACK 到该地址连接超时，Tada 预览应使用此独立 custom hostname。
-- 应用代码：`19ad339544e3440c5193ae4392c99286d31c6d21`；Worker 部署版本：`78eb59e8-5cbe-4bb9-b6eb-6531ae7afd20`。
+- 应用代码：`4a73301de240caa44cb19cc070838f5901193443`；Worker 部署版本：`f9df7453-75a0-4e14-9e05-eaad84737827`。
 - 预览仅绑定 `mail-profile-preview.mytada.ai`，没有 cron 或 Email Routing；生产 `mail.mytada.ai` route 和 `cloud-mail-mytada` Worker 未更新。共享 KV 中的线上发信设置保持原样。
 - `jwt_secret`、`managed_api_token`、`monitor_token` 为预览独立生成，通过 Wrangler secret bulk 导入；密钥值不写入 Git。Tada 预览使用同一个预览 `managed_api_token`，Authorization 不带 Bearer。
 
@@ -121,7 +121,7 @@ node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada-profi
 node node_modules/wrangler/bin/wrangler.js secret bulk /path/to/private-preview-secrets.json --config wrangler-mytada-profile-preview.toml
 ```
 
-当前预览配置未设置 `MAILBOX_ADDRESS_EDIT_ENABLED`，默认关闭；生产共享 D1 未执行本次地址迁移，schema gate 尚未开放。`mailboxProfile` 兼容未迁移 schema；`renameMailbox` 和 `finalizeMailboxRename` 为新协议接口。启用地址修改需要单独批准生产兼容升级和迁移，不能仅打开 flag 绕过此边界。生产 Worker 未更新。
+当前预览配置未设置 `MAILBOX_ADDRESS_EDIT_ENABLED`，默认关闭；生产共享 D1 未执行本次地址迁移，schema gate 尚未开放。`mailboxProfile` 兼容未迁移 schema；`checkMailboxAddress` 提供只读名称可用性检查，`renameMailbox` 和 `finalizeMailboxRename` 为新协议接口。新增的 `0002_managed_address_lifetime.sql` 以永久唯一记录保证同一用户终身仅能成功改址一次；该迁移同样尚未执行，缺少约束时不会开放改址。启用地址修改需要单独批准生产兼容升级和迁移，不能仅打开 flag 绕过此边界。生产 Worker 未更新。
 
 本次部署已验证公开 live=200、匿名 ready=401。前一版本曾验证授权 ready=200（D1/KV/R2 正常）；本次授权只读检查另行记录，不将旧验证当作新版本证据。未执行地址修改、数据库迁移或邮件收发测试。回滚此预览只操作独立预览 Worker 版本，不回滚、删除或重建共享资源。
 
