@@ -102,13 +102,13 @@ mytada.ai 的域名验证已完成。后续维护只调整该域所需 DKIM/SPF/
 
 回滚仅操作 `cloud-mail-mytada` 的 Worker 版本或停止 mytada.ai 的邮件路由，不删除 D1/KV/R2 数据，不对原部署执行默认 wrangler 命令。新部署没有使用 `/init` 进行升级的后门。
 
-## 邮箱名称功能预览（2026-11-12）
+## 邮箱地址功能预览（2026-11-12）
 
-**此预览经用户明确授权，共享线上 mytada D1、KV、R2。保存邮箱显示名会修改线上邮箱名称。独立 Worker 不代表数据隔离。** 不要用真实用户数据进行自动写入测试，也不要调整共享设置或发送邮件来检查部署。
+**此预览经用户明确授权，共享线上 mytada D1、KV、R2。目标功能是修改邮箱地址的 `localPart`，旧地址停用，仅新地址保留；这会影响线上邮箱身份，当前编辑尚未开放。独立 Worker 不代表数据隔离。** 不要用真实用户数据进行自动写入测试，也不要调整共享设置或发送邮件来检查部署。
 
 - 配置：`mail-worker/wrangler-mytada-profile-preview.toml`；Worker：`cloud-mail-mytada-profile-preview`。
 - 地址：<https://mail-profile-preview.mytada.ai>。原 workers.dev 地址保留，但 ACK 到该地址连接超时，Tada 预览应使用此独立 custom hostname。
-- 应用代码：`fb8ca0665577d187533538be057d748304608d51`；独立 custom hostname 部署版本：`d7a1fb42-4057-4a96-bba9-46cb0b1f9c92`。
+- 应用代码：`19ad339544e3440c5193ae4392c99286d31c6d21`；Worker 部署版本：`78eb59e8-5cbe-4bb9-b6eb-6531ae7afd20`。
 - 预览仅绑定 `mail-profile-preview.mytada.ai`，没有 cron 或 Email Routing；生产 `mail.mytada.ai` route 和 `cloud-mail-mytada` Worker 未更新。共享 KV 中的线上发信设置保持原样。
 - `jwt_secret`、`managed_api_token`、`monitor_token` 为预览独立生成，通过 Wrangler secret bulk 导入；密钥值不写入 Git。Tada 预览使用同一个预览 `managed_api_token`，Authorization 不带 Bearer。
 
@@ -121,6 +121,8 @@ node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada-profi
 node node_modules/wrangler/bin/wrangler.js secret bulk /path/to/private-preview-secrets.json --config wrangler-mytada-profile-preview.toml
 ```
 
-已验证 live=200、匿名 ready=401、授权 ready=200（D1/KV/R2 全部正常）、注册入口=404。实际托管接口为 `/api/public/mailboxProfile` 和 `/api/public/updateMailboxProfile`；授权空 payload 返回 400，确认参数校验生效。未执行真实邮箱保存或收发邮件测试，不能据此声称端到端写入或邮件投递已验收。回滚此预览只操作独立预览 Worker 版本，不回滚、删除或重建共享资源。
+当前预览配置未设置 `MAILBOX_ADDRESS_EDIT_ENABLED`，默认关闭；生产共享 D1 未执行本次地址迁移，schema gate 尚未开放。`mailboxProfile` 兼容未迁移 schema；`renameMailbox` 和 `finalizeMailboxRename` 为新协议接口。启用地址修改需要单独批准生产兼容升级和迁移，不能仅打开 flag 绕过此边界。生产 Worker 未更新。
 
-独立 hostname 创建前，Workers domains API 确认无同名绑定，DNS 查询返回 NXDOMAIN；OAuth 不具备 DNS records list 权限。部署后已用 Cloudflare edge 显式解析并保留 TLS 证书校验验证 custom hostname：live=200、授权 ready=200、两个托管 profile 接口授权空 payload=400；本地旧 NXDOMAIN 负缓存未刷新时，普通 DNS 访问仍需等待。ACK 访问应在切换配置后单独核验。
+本次部署已验证公开 live=200、匿名 ready=401。前一版本曾验证授权 ready=200（D1/KV/R2 正常）；本次授权只读检查另行记录，不将旧验证当作新版本证据。未执行地址修改、数据库迁移或邮件收发测试。回滚此预览只操作独立预览 Worker 版本，不回滚、删除或重建共享资源。
+
+独立 hostname 创建前，Workers domains API 确认无同名绑定，DNS 查询返回 NXDOMAIN；OAuth 不具备 DNS records list 权限。当前普通 DNS 与 TLS 访问正常；ACK 访问仍应独立核验。
