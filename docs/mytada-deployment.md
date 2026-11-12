@@ -115,7 +115,7 @@ mytada.ai 的域名验证已完成。后续维护只调整该域所需 DKIM/SPF/
 - 配置：`mail-worker/wrangler-mytada-profile-preview.toml`；Worker：`cloud-mail-mytada-profile-preview`。
 - 地址：<https://mail-profile-preview.mytada.ai>。原 workers.dev 地址保留，但 ACK 到该地址连接超时，Tada 预览应使用此独立 custom hostname。
 - 应用代码：`b2ead0ff16b891b71ec5cc3116b57bcca9fc7978`；Worker 部署版本：`aa64b493-f40c-4969-a095-17311034723b`。
-- 预览仅绑定 `mail-profile-preview.mytada.ai`，没有 cron 或 Email Routing；生产 `mail.mytada.ai` route 和 `cloud-mail-mytada` Worker 未更新。共享 KV 中的线上发信设置保持原样。
+- 预览仅绑定 `mail-profile-preview.mytada.ai`，没有 cron 或 Email Routing；预览发布不调整生产 route 或 Worker；后续正式版本见上节。共享 KV 中的线上发信设置保持原样。
 - `jwt_secret`、`managed_api_token`、`monitor_token` 为预览独立生成，通过 Wrangler secret bulk 导入；密钥值不写入 Git。Tada 预览使用同一个预览 `managed_api_token`，Authorization 不带 Bearer。
 
 复现构建与部署时，从 `mail-worker` 运行以下命令，并确认独立预览 Worker 名称及共享资源范围；严禁省略 `--config`。本机复用 arm64 依赖时使用 Cursor 的 arm64 Node。
