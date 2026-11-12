@@ -1,3 +1,4 @@
+import { formatSender } from '../utils/mailbox-name';
 import orm from '../entity/orm';
 import email from '../entity/email';
 import { attConst, emailConst, isDel, settingConst } from '../const/entity-const';
@@ -265,7 +266,7 @@ const emailService = {
 			const resend = new Resend(resendToken);
 
 			const sendForm = {
-				from: `${name} <${accountRow.email}>`,
+				from: formatSender(name, accountRow.email),
 				to: [...receiveEmail],
 				subject: subject,
 				text: text,

@@ -47,3 +47,11 @@ The email and attachment must belong to the exact account/user; deleted emails a
 ## Local verification
 
 From `mail-worker`, run `node node_modules/vitest/vitest.mjs run --config vitest.unit.config.js` (or `pnpm test:unit`). Tests use Wrangler's already-installed Miniflare D1 runtime and do not access deployed services. The Cloudflare worker-pool starter test remains in the separate `vitest.config.js` suite.
+
+## Sender profile (local implementation, not deployed)
+
+`POST /api/public/mailboxProfile` accepts exactly `{ownerEmail, externalKey}`.
+`POST /api/public/updateMailboxProfile` accepts exactly `{ownerEmail, externalKey, displayName}`.
+Both are included in the isolated mytada service-token route allowlist and use the same Authorization header as existing managed endpoints. The address and `tada:<scope>:<UUID>` key must identify the same active account and user; mismatches fail closed. Missing mailboxes return 404 without creating anything. Unknown fields are rejected.
+
+Success returns `{code:200,message:"success",data:{address,displayName}}`. Updates trim whitespace, require 1–40 Unicode codepoints, and reject control/surrogate characters and line separators. The only persisted change is `account.name`; the response comes from the updated row. Account IDs, email, external key, user nickname, creation defaults and historical messages do not change. Public and signed-in send paths safely quote display-name phrases (including Chinese and quotes) for Resend; unsafe pre-existing names fail before external sending. Changes apply to future sends only.

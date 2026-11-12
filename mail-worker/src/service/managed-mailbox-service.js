@@ -1,3 +1,4 @@
+import { validateDisplayName } from '../utils/mailbox-name';
 import BizError from '../error/biz-error';
 import cryptoUtils from '../utils/crypto-utils';
 import roleService from './role-service';
@@ -9,7 +10,7 @@ const MAX_CREATE_ATTEMPTS = 10;
 // Reserve two of D1's 100 SQL variables for exact mailbox ownership.
 const ATTACHMENT_QUERY_BATCH_SIZE = 98;
 const EXTERNAL_KEY_PATTERN = /^tada:[A-Za-z0-9_-]{1,48}:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const ACCOUNT_SELECT = `SELECT a.email AS address, a.account_id AS accountId, a.user_id AS userId,
+const ACCOUNT_SELECT = `SELECT a.email AS address, a.name AS displayName, a.external_key AS externalKey, a.account_id AS accountId, a.user_id AS userId,
   a.status AS accountStatus, a.is_del AS accountDeleted, u.user_id AS ownerId,
   u.status AS userStatus, u.is_del AS userDeleted FROM account a LEFT JOIN user u ON u.user_id = a.user_id`;
 
@@ -40,6 +41,27 @@ function randomAddress(domain) {
 }
 
 const managedMailboxService = {
+  async profile(c, params, update = false) {
+    const allowed = update ? ['ownerEmail', 'externalKey', 'displayName'] : ['ownerEmail', 'externalKey'];
+    if (!params || typeof params !== 'object' || Array.isArray(params) || Object.keys(params).some(key => !allowed.includes(key))) {
+      throw new BizError('邮箱参数无效', 400);
+    }
+    if (typeof params.externalKey !== 'string' || !EXTERNAL_KEY_PATTERN.test(params.externalKey)) throw new BizError('externalKey 参数无效', 400);
+    const owner = await this.resolveOwner(c, params.ownerEmail);
+    if (owner.externalKey !== params.externalKey) throw new BizError('邮箱归属不匹配', 403);
+    if (update) {
+      const name = validateDisplayName(params.displayName);
+      const row = await c.env.db.prepare(`UPDATE account SET name = ? WHERE account_id = ? AND user_id = ?
+        AND external_key = ? AND status = 0 AND is_del = 0
+        AND EXISTS (SELECT 1 FROM user WHERE user_id = ? AND status = 0 AND is_del = 0)
+        RETURNING email AS address, name AS displayName`)
+        .bind(name, owner.accountId, owner.userId, params.externalKey, owner.userId).first();
+      if (!row) throw new BizError('受管邮箱不可用', 409);
+      return row;
+    }
+    return { address: owner.address, displayName: owner.displayName };
+  },
+
   async findByExternalKey(c, externalKey) {
     return c.env.db.prepare(`${ACCOUNT_SELECT} WHERE a.external_key = ?`).bind(externalKey).first();
   },

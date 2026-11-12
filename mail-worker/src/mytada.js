@@ -6,6 +6,8 @@ import result from './model/result';
 const managedApp = new Hono();
 const PUBLIC_METHODS = {
   ensureMailbox: 'ensureMailbox',
+  mailboxProfile: 'mailboxProfile',
+  updateMailboxProfile: 'updateMailboxProfile',
   emailList: 'emailList',
   sendEmail: 'sendEmail',
   attachment: 'attachment',

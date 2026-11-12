@@ -1,3 +1,4 @@
+import { formatSender } from '../utils/mailbox-name';
 import BizError from '../error/biz-error';
 import orm from '../entity/orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,6 +23,14 @@ import managedMailboxService from './managed-mailbox-service';
 import { managedMailFilter } from '../utils/managed-mail-filter';
 
 const publicService = {
+
+  async mailboxProfile(c, params) {
+    return managedMailboxService.profile(c, params);
+  },
+
+  async updateMailboxProfile(c, params) {
+    return managedMailboxService.profile(c, params, true);
+  },
 
   async ensureMailbox(c, params) {
     return managedMailboxService.ensureMailbox(c, params);
@@ -262,7 +271,7 @@ const publicService = {
 			}
 
 			const sendForm = {
-				from: `${name} <${from}>`,
+				from: formatSender(name, from),
 				to: [...cleanRecipients],
 				subject: subject ?? '',
 				text: text ?? undefined,
