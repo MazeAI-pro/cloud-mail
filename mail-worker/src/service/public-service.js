@@ -1,4 +1,4 @@
-import mailboxAddressService, { isRetiredAddress } from './mailbox-address-service';
+import mailboxAddressService from './mailbox-address-service';
 import { formatSender } from '../utils/mailbox-name';
 import BizError from '../error/biz-error';
 import orm from '../entity/orm';
@@ -37,9 +37,6 @@ const publicService = {
     return mailboxAddressService.rename(c, params);
   },
 
-  async finalizeMailboxRename(c, params) {
-    return mailboxAddressService.finalize(c, params);
-  },
 
   async ensureMailbox(c, params) {
     return managedMailboxService.ensureMailbox(c, params);
@@ -240,10 +237,6 @@ const publicService = {
 			}
 		}
 
-    if (await isRetiredAddress(c, from)) throw new BizError('Sender address retired', 409);
-    for (const recipient of cleanRecipients) {
-      if (await isRetiredAddress(c, recipient)) throw new BizError('Recipient address retired', 409);
-    }
 
 		const { resendTokens, send, domainList } = await settingService.query(c);
 

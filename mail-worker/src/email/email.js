@@ -1,4 +1,3 @@
-import { isRetiredAddress } from '../service/mailbox-address-service';
 import PostalMime from 'postal-mime';
 import emailService from '../service/email-service';
 import accountService from '../service/account-service';
@@ -34,10 +33,6 @@ export function resolveReceiveStatus({ account, noRecipient, shouldForwardToPeop
 export async function email(message, env, ctx) {
 
 	try {
-    if (await isRetiredAddress({ env }, message.to)) {
-      message.setReject('Recipient address retired');
-      return;
-    }
 
 		const {
 			receive,

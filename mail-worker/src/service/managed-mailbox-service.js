@@ -83,7 +83,7 @@ const managedMailboxService = {
           // A concurrent creator or a committed request whose response timed out wins.
           const winner = await this.findByExternalKey(c, externalKey);
           if (winner) return { address: usableAccount(winner).address, created: false };
-          if (!/UNIQUE constraint failed: (?:account|user)\.email\b|retired_address/i.test(error.message)) throw error;
+          if (!/UNIQUE constraint failed: (?:account|user)\.email\b/i.test(error.message)) throw error;
         }
       }
       throw new BizError('邮箱地址分配冲突，请重试', 503);

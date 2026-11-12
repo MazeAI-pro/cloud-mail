@@ -31,6 +31,6 @@ app.post('/public/attachment', async (c) => {
   return publicService.attachment(c, await c.req.json());
 });
 
-for (const method of ['mailboxProfile', 'checkMailboxAddress', 'renameMailbox', 'finalizeMailboxRename']) {
+for (const method of ['mailboxProfile', 'checkMailboxAddress', 'renameMailbox']) {
   app.post(`/public/${method}`, async c => c.json(result.ok(await publicService[method](c, await c.req.json()))));
 }

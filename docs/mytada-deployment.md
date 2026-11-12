@@ -121,8 +121,4 @@ node node_modules/wrangler/bin/wrangler.js deploy --config wrangler-mytada-profi
 node node_modules/wrangler/bin/wrangler.js secret bulk /path/to/private-preview-secrets.json --config wrangler-mytada-profile-preview.toml
 ```
 
-当前预览配置未设置 `MAILBOX_ADDRESS_EDIT_ENABLED`，默认关闭；生产共享 D1 未执行本次地址迁移，schema gate 尚未开放。`mailboxProfile` 兼容未迁移 schema；`checkMailboxAddress` 提供只读名称可用性检查，`renameMailbox` 和 `finalizeMailboxRename` 为新协议接口。新增的 `0002_managed_address_lifetime.sql` 以永久唯一记录保证同一用户终身仅能成功改址一次；该迁移同样尚未执行，缺少约束时不会开放改址。启用地址修改需要单独批准生产兼容升级和迁移，不能仅打开 flag 绕过此边界。生产 Worker 未更新。
-
-本次部署已验证公开 live=200、匿名 ready=401。前一版本曾验证授权 ready=200（D1/KV/R2 正常）；本次授权只读检查另行记录，不将旧验证当作新版本证据。未执行地址修改、数据库迁移或邮件收发测试。回滚此预览只操作独立预览 Worker 版本，不回滚、删除或重建共享资源。
-
-独立 hostname 创建前，Workers domains API 确认无同名绑定，DNS 查询返回 NXDOMAIN；OAuth 不具备 DNS records list 权限。当前普通 DNS 与 TLS 访问正常；ACK 访问仍应独立核验。
+当前简化改址候选删除此前门禁和未执行的 0001/0002 迁移，不增加 Cloud 表。Profile/check 接口只读；rename 通过现有 account/user 两行 CAS 更新并解绑旧地址。终身一次由 Tada 已有 user_settings 标记维护；Account 兼容接口和 017 扩容是发布前置。此段记录本地候选，不表示已发布或已实际改址。

@@ -351,13 +351,13 @@ describe('managed mailbox address profile', () => {
     expect(await publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY })).toMatchObject({ provisioned: false });
     expect(await env.db.prepare('SELECT count(*) AS total FROM account').first()).toEqual({ total: 0 });
     const { address } = await ensure();
-    expect(await publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY })).toMatchObject({ address, canEditAddress: false });
+    expect(await publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY })).toMatchObject({ address });
     await expect(publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address })).rejects.toMatchObject({ code: 400 });
     await env.db.prepare('UPDATE user SET status = 1').run();
     await expect(publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY })).rejects.toMatchObject({ code: 409 });
   });
   it('protects profile and rename routes with the service token', async () => {
-    for (const method of ['mailboxProfile', 'renameMailbox', 'finalizeMailboxRename']) {
+    for (const method of ['mailboxProfile', 'renameMailbox']) {
       const response = await mytadaWorker.fetch(new Request(`https://mail.test/api/public/${method}`, { method: 'POST', body: '{}' }), { managed_api_token: 'x'.repeat(32) }, {});
       expect(response.status).toBe(401);
     }

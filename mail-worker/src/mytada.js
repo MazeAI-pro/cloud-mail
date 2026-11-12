@@ -9,7 +9,6 @@ const PUBLIC_METHODS = {
   mailboxProfile: 'mailboxProfile',
   checkMailboxAddress: 'checkMailboxAddress',
   renameMailbox: 'renameMailbox',
-  finalizeMailboxRename: 'finalizeMailboxRename',
   emailList: 'emailList',
   sendEmail: 'sendEmail',
   attachment: 'attachment',
