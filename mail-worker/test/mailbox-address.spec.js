@@ -1,0 +1,60 @@
+import { readFileSync } from 'node:fs';
+import { beforeAll, beforeEach, afterAll, expect, it } from 'vitest';
+import { createLocalD1 } from './helpers/local-d1';
+import { dbInit } from '../src/init/init';
+import managed from '../src/service/managed-mailbox-service';
+import addressService, { isRetiredAddress, normalizeLocalPart } from '../src/service/mailbox-address-service';
+import { email } from '../src/email/email';
+const KEY = 'tada:dev:550e8400-e29b-41d4-a716-446655440000';
+const OP = '00000000-0000-4000-8000-000000000001';
+let runtime, c;
+beforeAll(async () => {
+  runtime = await createLocalD1();
+  const store = new Map();
+  c = { env: { db: runtime.db, domain: ['mytada.ai'], managed_mailbox_domain: 'mytada.ai', MAILBOX_ADDRESS_EDIT_ENABLED: 'true', jwt_secret: 'test', kv: { get: async (key, options) => options?.type === 'json' ? JSON.parse(store.get(key) || 'null') : store.get(key), put: async (key, value) => store.set(key, value) } }, req: { param: () => 'test', header: () => undefined }, text: value => value, set: (key, value) => store.set(key, value), get: key => store.get(key) };
+  await dbInit.init(c);
+});
+afterAll(async () => { await runtime.dispose(); });
+it('reads existing mailbox without migration and fails closed for edits', async () => {
+  const box = await managed.ensureMailbox(c, { externalKey: KEY });
+  expect(await addressService.profile(c, { externalKey: KEY })).toMatchObject({ address: box.address, canEditAddress: false });
+  await expect(addressService.rename(c, { externalKey: KEY, expectedAddress: box.address, newLocalPart: 'helios', operationId: OP })).rejects.toMatchObject({ code: 503 });
+  const migration = readFileSync(new URL('../migrations/0001_managed_address_changes.sql', import.meta.url), 'utf8');
+  const statements = migration.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE (?:TABLE|UNIQUE INDEX)[\s\S]*?;/g);
+  await c.env.db.batch(statements.map(sql => c.env.db.prepare(sql)));
+});
+it('atomically renames identity, preserves history, retries and permanently retires old address', async () => {
+  const before = await managed.findByExternalKey(c, KEY);
+  await c.env.db.prepare("INSERT INTO email(account_id,user_id,send_email,to_email,subject) VALUES(?,?,?,?,?)").bind(before.accountId, before.userId, before.address, 'recipient@test.com', 'History').run();
+  const params = { externalKey: KEY, expectedAddress: before.address, newLocalPart: ' HeLios ', operationId: OP };
+  const results = await Promise.all([addressService.rename(c, params), addressService.rename(c, params)]);
+  expect(results[0]).toEqual(results[1]);
+  expect(results[0].address).toBe('helios@mytada.ai');
+  const after = await managed.findByExternalKey(c, KEY);
+  expect(after).toMatchObject({ accountId: before.accountId, userId: before.userId, displayName: 'helios' });
+  expect((await c.env.db.prepare('SELECT email FROM user').first()).email).toBe('helios@mytada.ai');
+  expect((await c.env.db.prepare('SELECT send_email FROM email').first()).send_email).toBe(before.address);
+  expect(await isRetiredAddress(c, before.address)).toBe(true);
+  await expect(c.env.db.prepare('INSERT INTO account(email, user_id) VALUES(?,?)').bind(before.address, before.userId).run()).rejects.toThrow('retired_address');
+  await expect(c.env.db.prepare('UPDATE user SET email = ? WHERE user_id = ?').bind(before.address, before.userId).run()).rejects.toThrow('retired_address');
+  let rejection;
+  await email({ to: before.address, setReject: reason => { rejection = reason; } }, { ...c.env, MAILBOX_ADDRESS_EDIT_ENABLED: 'false' }, {});
+  expect(rejection).toBe('Recipient address retired');
+  await expect(addressService.rename(c, { ...params, expectedAddress: 'helios@mytada.ai', newLocalPart: 'another', operationId: OP.replace(/1$/, '2') })).rejects.toMatchObject({ code: 409 });
+  expect((await addressService.profile(c, { externalKey: KEY })).pendingOperation.operationId).toBe(OP);
+  await addressService.finalize(c, { externalKey: KEY, operationId: OP, address: 'helios@mytada.ai' });
+  expect((await addressService.profile(c, { externalKey: KEY })).pendingOperation).toBeNull();
+});
+it('rolls back collisions without losing old identity and preserves custom sender name', async () => {
+  const key = KEY.replace(/0$/, '1');
+  const box = await managed.ensureMailbox(c, { externalKey: key, displayName: 'Custom Name' });
+  const params = { externalKey: key, expectedAddress: box.address, newLocalPart: 'helios', operationId: OP.replace(/1$/, '3') };
+  await expect(addressService.rename(c, params)).rejects.toMatchObject({ code: 409 });
+  expect((await managed.findByExternalKey(c, key)).address).toBe(box.address);
+  expect(await isRetiredAddress(c, box.address)).toBe(false);
+  await addressService.rename(c, { ...params, newLocalPart: 'another' });
+  expect((await managed.findByExternalKey(c, key)).displayName).toBe('Custom Name');
+});
+it.each(['ab', 'admin', 'x..y', '.abc', 'abc-', 'a'.repeat(33), '中文', 'u12345678', 'x\r\ny'])('rejects invalid or reserved prefix %j', value => {
+  expect(() => normalizeLocalPart(value)).toThrow();
+});

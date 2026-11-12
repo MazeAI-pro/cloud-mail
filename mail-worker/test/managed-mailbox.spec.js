@@ -346,30 +346,18 @@ describe('isolated mytada entrypoint integration', () => {
 });
 
 
-describe('managed mailbox profile', () => {
-  it('reads without creation and persists only the owned account name', async () => {
-    await expect(publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: 'u12345678@mazeai.pro' })).rejects.toThrow();
+describe('managed mailbox address profile', () => {
+  it('reads by trusted external key without creation and rejects owner overrides', async () => {
+    expect(await publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY })).toMatchObject({ provisioned: false });
     expect(await env.db.prepare('SELECT count(*) AS total FROM account').first()).toEqual({ total: 0 });
     const { address } = await ensure();
-    expect(await publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address })).toEqual({ address, displayName: address.split('@')[0] });
-    expect(await publicService.updateMailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address, displayName: '  小王 "旅行"  ' })).toEqual({ address, displayName: '小王 "旅行"' });
-    expect((await publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address })).displayName).toBe('小王 "旅行"');
-    expect((await env.db.prepare('SELECT email FROM user').first()).email).toBe(address);
-  });
-  it.each(['', '  ', 'a'.repeat(41), 'x\r\nBcc: victim@example.com', 'x\u0085y', 'x\u0000y'])('rejects unsafe name %j', async displayName => {
-    const { address } = await ensure();
-    await expect(publicService.updateMailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address, displayName })).rejects.toMatchObject({ code: 400 });
-  });
-  it('counts Unicode codepoints and rejects extra selectors and inactive owners', async () => {
-    const { address } = await ensure();
-    await expect(publicService.updateMailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address, displayName: '😀'.repeat(40) })).resolves.toMatchObject({ displayName: '😀'.repeat(40) });
-    await expect(publicService.updateMailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address, displayName: 'ok', uid: 2 })).rejects.toMatchObject({ code: 400 });
-    await expect(publicService.mailboxProfile(c, { ownerEmail: address, externalKey: EXTERNAL_KEY.replace('dev', 'other') })).rejects.toMatchObject({ code: 403 });
+    expect(await publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY })).toMatchObject({ address, canEditAddress: false });
+    await expect(publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address })).rejects.toMatchObject({ code: 400 });
     await env.db.prepare('UPDATE user SET status = 1').run();
-    await expect(publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY, ownerEmail: address })).rejects.toMatchObject({ code: 409 });
+    await expect(publicService.mailboxProfile(c, { externalKey: EXTERNAL_KEY })).rejects.toMatchObject({ code: 409 });
   });
-  it('protects both isolated profile routes with the service token', async () => {
-    for (const method of ['mailboxProfile', 'updateMailboxProfile']) {
+  it('protects profile and rename routes with the service token', async () => {
+    for (const method of ['mailboxProfile', 'renameMailbox', 'finalizeMailboxRename']) {
       const response = await mytadaWorker.fetch(new Request(`https://mail.test/api/public/${method}`, { method: 'POST', body: '{}' }), { managed_api_token: 'x'.repeat(32) }, {});
       expect(response.status).toBe(401);
     }

@@ -1,4 +1,3 @@
-import { validateDisplayName } from '../utils/mailbox-name';
 import BizError from '../error/biz-error';
 import cryptoUtils from '../utils/crypto-utils';
 import roleService from './role-service';
@@ -41,27 +40,6 @@ function randomAddress(domain) {
 }
 
 const managedMailboxService = {
-  async profile(c, params, update = false) {
-    const allowed = update ? ['ownerEmail', 'externalKey', 'displayName'] : ['ownerEmail', 'externalKey'];
-    if (!params || typeof params !== 'object' || Array.isArray(params) || Object.keys(params).some(key => !allowed.includes(key))) {
-      throw new BizError('邮箱参数无效', 400);
-    }
-    if (typeof params.externalKey !== 'string' || !EXTERNAL_KEY_PATTERN.test(params.externalKey)) throw new BizError('externalKey 参数无效', 400);
-    const owner = await this.resolveOwner(c, params.ownerEmail);
-    if (owner.externalKey !== params.externalKey) throw new BizError('邮箱归属不匹配', 403);
-    if (update) {
-      const name = validateDisplayName(params.displayName);
-      const row = await c.env.db.prepare(`UPDATE account SET name = ? WHERE account_id = ? AND user_id = ?
-        AND external_key = ? AND status = 0 AND is_del = 0
-        AND EXISTS (SELECT 1 FROM user WHERE user_id = ? AND status = 0 AND is_del = 0)
-        RETURNING email AS address, name AS displayName`)
-        .bind(name, owner.accountId, owner.userId, params.externalKey, owner.userId).first();
-      if (!row) throw new BizError('受管邮箱不可用', 409);
-      return row;
-    }
-    return { address: owner.address, displayName: owner.displayName };
-  },
-
   async findByExternalKey(c, externalKey) {
     return c.env.db.prepare(`${ACCOUNT_SELECT} WHERE a.external_key = ?`).bind(externalKey).first();
   },
@@ -105,7 +83,7 @@ const managedMailboxService = {
           // A concurrent creator or a committed request whose response timed out wins.
           const winner = await this.findByExternalKey(c, externalKey);
           if (winner) return { address: usableAccount(winner).address, created: false };
-          if (!/UNIQUE constraint failed: (?:account|user)\.email\b/i.test(error.message)) throw error;
+          if (!/UNIQUE constraint failed: (?:account|user)\.email\b|retired_address/i.test(error.message)) throw error;
         }
       }
       throw new BizError('邮箱地址分配冲突，请重试', 503);

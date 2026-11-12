@@ -1,3 +1,4 @@
+import { isRetiredAddress } from './mailbox-address-service';
 import { formatSender } from '../utils/mailbox-name';
 import orm from '../entity/orm';
 import email from '../entity/email';
@@ -230,6 +231,11 @@ const emailService = {
 
 		}
 
+    if (await isRetiredAddress(c, accountRow.email)) throw new BizError('Sender address retired', 409);
+    for (const recipient of receiveEmail) {
+      if (await isRetiredAddress(c, recipient)) throw new BizError('Recipient address retired', 409);
+    }
+
 		const domain = emailUtils.getDomain(accountRow.email);
 		const resendToken = resendTokens[domain];
 
@@ -385,6 +391,7 @@ const emailService = {
 		const emailDataList = [];
 
 		for (const email of receiveEmail) {
+      if (await isRetiredAddress(c, email)) continue;
 
 			//把发件人邮件改成收件
 			const emailValues = {...sendEmailData}
